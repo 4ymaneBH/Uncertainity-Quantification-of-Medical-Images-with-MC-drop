@@ -1,0 +1,21 @@
+dataset:
+  dir: ./data/Brain_Tumor_Detection
+  test_split: 0.2
+  image_size: 150
+  batch_size: 32
+
+model:
+  path: ./models/monte_carlo_trained_model.pth
+  dropout_rate: 0.5
+
+training:
+  epochs: 5
+  learning_rate: 0.001
+
+inference:
+  num_mc_samples: 100
+  threshold: 0.5
+
+api:
+  host: 0.0.0.0
+  port: 8000
