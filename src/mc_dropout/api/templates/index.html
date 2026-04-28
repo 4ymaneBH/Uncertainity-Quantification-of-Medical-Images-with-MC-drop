@@ -1,1 +1,250 @@
-<!DOCTYPE html><html><body><h1>MC Dropout UQ</h1></body></html>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Brain Tumor Detection — MC Dropout UQ</title>
+    <style>
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: 'Segoe UI', system-ui, sans-serif;
+            background: #0f1923;
+            color: #e8eaf0;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 2.5rem 1rem;
+        }
+        h1 { font-size: 1.75rem; font-weight: 700; color: #7eb8f7; }
+        .subtitle { color: #8892a4; font-size: 0.875rem; margin-top: 0.25rem; margin-bottom: 2rem; }
+        .card {
+            background: #1a2535;
+            border-radius: 14px;
+            padding: 2rem;
+            width: 100%;
+            max-width: 580px;
+            box-shadow: 0 6px 32px rgba(0,0,0,0.5);
+        }
+        .upload-area {
+            border: 2px dashed #3a4f6a;
+            border-radius: 10px;
+            padding: 2.5rem 1.5rem;
+            text-align: center;
+            cursor: pointer;
+            transition: border-color 0.2s, background 0.2s;
+        }
+        .upload-area:hover, .upload-area.dragover {
+            border-color: #7eb8f7;
+            background: rgba(126,184,247,0.04);
+        }
+        .upload-area input[type="file"] { display: none; }
+        .upload-icon { font-size: 2.75rem; display: block; margin-bottom: 0.6rem; }
+        .upload-area strong { font-size: 1rem; }
+        .upload-area p { color: #8892a4; font-size: 0.85rem; margin-top: 0.35rem; }
+        #file-name { margin-top: 0.6rem; color: #7eb8f7; font-size: 0.82rem; min-height: 1.1em; }
+        #preview {
+            max-width: 100%;
+            max-height: 220px;
+            border-radius: 8px;
+            margin-top: 1rem;
+            display: none;
+            object-fit: contain;
+        }
+        .btn {
+            display: block;
+            width: 100%;
+            margin-top: 1.25rem;
+            padding: 0.9rem;
+            background: #2d6fca;
+            color: #fff;
+            border: none;
+            border-radius: 10px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        .btn:hover:not(:disabled) { background: #3a84e8; }
+        .btn:disabled { background: #1e2e42; color: #4a6070; cursor: not-allowed; }
+        .spinner {
+            display: none;
+            margin: 1.25rem auto 0;
+            width: 34px; height: 34px;
+            border: 3px solid #2d3f58;
+            border-top-color: #7eb8f7;
+            border-radius: 50%;
+            animation: spin 0.75s linear infinite;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .error {
+            display: none;
+            margin-top: 1rem;
+            padding: 0.85rem 1rem;
+            background: rgba(255,107,107,0.08);
+            border: 1px solid #ff6b6b;
+            border-radius: 8px;
+            color: #ff8e8e;
+            font-size: 0.875rem;
+        }
+        .results { display: none; margin-top: 1.75rem; padding-top: 1.5rem; border-top: 1px solid #24364e; }
+        .diagnosis {
+            font-size: 2.1rem;
+            font-weight: 800;
+            text-align: center;
+            padding: 0.6rem 1rem;
+            border-radius: 10px;
+            margin-bottom: 1.5rem;
+            letter-spacing: 0.02em;
+        }
+        .diagnosis.tumor   { color: #ff6b6b; background: rgba(255,107,107,0.1); }
+        .diagnosis.no-tumor { color: #4ade80; background: rgba(74,222,128,0.08); }
+        .metric { margin-bottom: 1.1rem; }
+        .metric-label {
+            font-size: 0.7rem;
+            text-transform: uppercase;
+            letter-spacing: 0.07em;
+            color: #6a7f9a;
+            margin-bottom: 0.4rem;
+        }
+        .gauge-track {
+            height: 10px;
+            background: #243344;
+            border-radius: 999px;
+            overflow: hidden;
+        }
+        .gauge-fill {
+            height: 100%;
+            border-radius: 999px;
+            background: linear-gradient(90deg, #1e5fa8, #7eb8f7);
+            transition: width 0.55s cubic-bezier(0.4,0,0.2,1);
+        }
+        .metric-value { font-size: 0.82rem; color: #9aadc4; margin-top: 0.3rem; }
+        .histogram { margin-top: 1.25rem; }
+        .histogram img { width: 100%; border-radius: 8px; display: block; }
+    </style>
+</head>
+<body>
+    <h1>Brain Tumor Detection</h1>
+    <p class="subtitle">Monte Carlo Dropout &mdash; Uncertainty Quantification</p>
+
+    <div class="card">
+        <form id="upload-form">
+            <div class="upload-area" id="drop-zone">
+                <input type="file" id="file-input" accept="image/jpeg,image/png">
+                <span class="upload-icon">🧠</span>
+                <strong>Click to upload or drag &amp; drop</strong>
+                <p>Supports JPG &amp; PNG brain MRI images</p>
+                <div id="file-name"></div>
+                <img id="preview" alt="Image preview">
+            </div>
+            <button type="submit" class="btn" id="submit-btn" disabled>Analyse Image</button>
+        </form>
+
+        <div class="spinner" id="spinner"></div>
+        <div class="error"   id="error-box"></div>
+
+        <div class="results" id="results">
+            <div class="diagnosis" id="diagnosis"></div>
+
+            <div class="metric">
+                <div class="metric-label">Confidence &mdash; Mean Probability</div>
+                <div class="gauge-track">
+                    <div class="gauge-fill" id="gauge-fill" style="width:0%"></div>
+                </div>
+                <div class="metric-value" id="confidence-text"></div>
+            </div>
+
+            <div class="metric">
+                <div class="metric-label">Uncertainty &mdash; Standard Deviation (&sigma;)</div>
+                <div class="metric-value" id="uncertainty-text"></div>
+            </div>
+
+            <div class="histogram">
+                <div class="metric-label">MC Sample Distribution (100 forward passes)</div>
+                <img id="histogram-img" src="" alt="MC Dropout probability distribution">
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const fileInput  = document.getElementById('file-input');
+        const dropZone   = document.getElementById('drop-zone');
+        const fileNameEl = document.getElementById('file-name');
+        const preview    = document.getElementById('preview');
+        const submitBtn  = document.getElementById('submit-btn');
+        const spinner    = document.getElementById('spinner');
+        const errorBox   = document.getElementById('error-box');
+        const resultsEl  = document.getElementById('results');
+
+        dropZone.addEventListener('click', () => fileInput.click());
+        dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('dragover'); });
+        dropZone.addEventListener('dragleave', () => dropZone.classList.remove('dragover'));
+        dropZone.addEventListener('drop', e => {
+            e.preventDefault();
+            dropZone.classList.remove('dragover');
+            if (e.dataTransfer.files.length) setFile(e.dataTransfer.files[0]);
+        });
+        fileInput.addEventListener('change', () => { if (fileInput.files.length) setFile(fileInput.files[0]); });
+
+        function setFile(file) {
+            fileNameEl.textContent = file.name;
+            preview.src = URL.createObjectURL(file);
+            preview.style.display = 'block';
+            submitBtn.disabled = false;
+            resultsEl.style.display = 'none';
+            errorBox.style.display = 'none';
+        }
+
+        document.getElementById('upload-form').addEventListener('submit', async e => {
+            e.preventDefault();
+            if (!fileInput.files.length) return;
+
+            submitBtn.disabled = true;
+            spinner.style.display = 'block';
+            errorBox.style.display = 'none';
+            resultsEl.style.display = 'none';
+
+            const body = new FormData();
+            body.append('file', fileInput.files[0]);
+
+            try {
+                const res  = await fetch('/predict', { method: 'POST', body });
+                const data = await res.json();
+                if (!res.ok) { showError(data.detail || 'Prediction failed.'); return; }
+                showResults(data);
+            } catch (_) {
+                showError('Network error — is the server running?');
+            } finally {
+                spinner.style.display = 'none';
+                submitBtn.disabled = false;
+            }
+        });
+
+        function showError(msg) {
+            errorBox.textContent = msg;
+            errorBox.style.display = 'block';
+        }
+
+        function showResults(data) {
+            const diag = document.getElementById('diagnosis');
+            diag.textContent = data.prediction;
+            diag.className   = 'diagnosis ' + (data.prediction === 'Tumor' ? 'tumor' : 'no-tumor');
+
+            const pct = (data.mean_probability * 100).toFixed(1);
+            document.getElementById('gauge-fill').style.width = pct + '%';
+            document.getElementById('confidence-text').textContent =
+                pct + '%  (' + data.mean_probability.toFixed(4) + ')';
+
+            document.getElementById('uncertainty-text').textContent =
+                'σ = ' + data.uncertainty.toFixed(4);
+
+            document.getElementById('histogram-img').src =
+                'data:image/png;base64,' + data.histogram_b64;
+
+            resultsEl.style.display = 'block';
+            resultsEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+    </script>
+</body>
+</html>
