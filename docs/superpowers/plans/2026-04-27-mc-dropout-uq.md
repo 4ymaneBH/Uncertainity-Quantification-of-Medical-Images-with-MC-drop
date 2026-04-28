@@ -62,7 +62,7 @@ mkdir -p data
 ```toml
 [build-system]
 requires = ["setuptools>=68", "wheel"]
-build-backend = "setuptools.backends.legacy:build"
+build-backend = "setuptools.build_meta"
 
 [project]
 name = "mc-dropout-uq"

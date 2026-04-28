@@ -5,6 +5,10 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "mc-dropout-uq"
 version = "0.1.0"
+description = "Brain tumor detection with Monte Carlo Dropout uncertainty quantification"
+authors = [{name = "Aymane Bouhou", email = "aymanebcontact1@gmail.com"}]
+license = {text = "MIT"}
+readme = "README.md"
 requires-python = ">=3.9"
 dependencies = [
     "torch>=2.0",
@@ -20,9 +24,15 @@ dependencies = [
     "python-multipart>=0.0.6",
 ]
 
+[project.optional-dependencies]
+dev = ["pytest>=7.0", "httpx>=0.24"]
+
 [project.scripts]
 mc-train = "mc_dropout.train:main"
 mc-serve = "mc_dropout.api.main:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

@@ -8,8 +8,13 @@ build/
 *.egg-info/
 data/
 models/*.pth
-models/training_curves.png
+models/*.png
 .env
 kaggle.json
 *.zip
 brain_tumor_dataset/
+.pytest_cache/
+.coverage
+.DS_Store
+.idea/
+.vscode/
