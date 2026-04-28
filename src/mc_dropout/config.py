@@ -50,13 +50,13 @@ def load_config(path: str = "config.yaml") -> Config:
     if not config_path.exists():
         return Config()
 
-    with open(config_path) as f:
+    with open(config_path, encoding="utf-8") as f:
         data = yaml.safe_load(f) or {}
 
     return Config(
-        dataset=DatasetConfig(**data.get("dataset", {})),
-        model=ModelConfig(**data.get("model", {})),
-        training=TrainingConfig(**data.get("training", {})),
-        inference=InferenceConfig(**data.get("inference", {})),
-        api=ApiConfig(**data.get("api", {})),
+        dataset=DatasetConfig(**data.get("dataset") or {}),
+        model=ModelConfig(**data.get("model") or {}),
+        training=TrainingConfig(**data.get("training") or {}),
+        inference=InferenceConfig(**data.get("inference") or {}),
+        api=ApiConfig(**data.get("api") or {}),
     )

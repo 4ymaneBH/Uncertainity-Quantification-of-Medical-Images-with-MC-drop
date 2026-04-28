@@ -1,4 +1,3 @@
-import pytest
 from mc_dropout.config import (
     Config, DatasetConfig, ModelConfig, TrainingConfig,
     InferenceConfig, ApiConfig, load_config,
@@ -24,3 +23,10 @@ def test_load_config_partial_section(tmp_path):
     config = load_config(str(yaml_file))
     assert config.dataset.batch_size == 64
     assert config.dataset.image_size == 150  # default preserved
+
+def test_load_config_handles_null_section(tmp_path):
+    yaml_file = tmp_path / "cfg.yaml"
+    yaml_file.write_text("dataset:\ntraining:\n  epochs: 10\n")
+    config = load_config(str(yaml_file))
+    assert config.dataset.image_size == 150
+    assert config.training.epochs == 10
