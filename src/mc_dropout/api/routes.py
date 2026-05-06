@@ -27,7 +27,7 @@ class PredictionResponse(BaseModel):
 
 @router.get("/", response_class=HTMLResponse)
 async def index(request: Request) -> HTMLResponse:
-    return templates.TemplateResponse("index.html", {"request": request})
+    return templates.TemplateResponse(request, "index.html")
 
 
 @router.post("/predict", response_model=PredictionResponse)
