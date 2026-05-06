@@ -14,16 +14,33 @@
             display: flex;
             flex-direction: column;
             align-items: center;
-            padding: 2.5rem 1rem;
+            padding: 2.5rem 1rem 4rem;
         }
         h1 { font-size: 1.75rem; font-weight: 700; color: #7eb8f7; }
-        .subtitle { color: #8892a4; font-size: 0.875rem; margin-top: 0.25rem; margin-bottom: 2rem; }
+        .subtitle { color: #8892a4; font-size: 0.875rem; margin-top: 0.25rem; }
+
+        /* Model version badge */
+        .model-badge {
+            display: none;
+            margin-top: 0.75rem;
+            margin-bottom: 1.75rem;
+            padding: 0.3rem 0.85rem;
+            background: #1a2535;
+            border: 1px solid #2a3f58;
+            border-radius: 999px;
+            font-size: 0.78rem;
+            color: #6a9fd8;
+            letter-spacing: 0.02em;
+        }
+        .model-badge span { color: #4ade80; font-weight: 600; }
+
+        /* Upload card */
         .card {
             background: #1a2535;
             border-radius: 14px;
             padding: 2rem;
             width: 100%;
-            max-width: 580px;
+            max-width: 600px;
             box-shadow: 0 6px 32px rgba(0,0,0,0.5);
         }
         .upload-area {
@@ -43,14 +60,6 @@
         .upload-area strong { font-size: 1rem; }
         .upload-area p { color: #8892a4; font-size: 0.85rem; margin-top: 0.35rem; }
         #file-name { margin-top: 0.6rem; color: #7eb8f7; font-size: 0.82rem; min-height: 1.1em; }
-        #preview {
-            max-width: 100%;
-            max-height: 220px;
-            border-radius: 8px;
-            margin-top: 1rem;
-            display: none;
-            object-fit: contain;
-        }
         .btn {
             display: block;
             width: 100%;
@@ -87,17 +96,49 @@
             color: #ff8e8e;
             font-size: 0.875rem;
         }
-        .results { display: none; margin-top: 1.75rem; padding-top: 1.5rem; border-top: 1px solid #24364e; }
+
+        /* Full result cards (current batch) */
+        #results-container { margin-top: 0; }
+        .result-card {
+            margin-top: 1.75rem;
+            padding-top: 1.5rem;
+            border-top: 1px solid #24364e;
+        }
+        .result-card + .result-card { margin-top: 1.25rem; }
+        .result-header {
+            display: flex;
+            align-items: flex-start;
+            gap: 1rem;
+            margin-bottom: 1.25rem;
+        }
+        .result-thumb {
+            width: 72px;
+            height: 72px;
+            object-fit: cover;
+            border-radius: 8px;
+            flex-shrink: 0;
+            border: 1px solid #2a3f58;
+        }
+        .result-filename {
+            font-size: 0.8rem;
+            color: #6a7f9a;
+            margin-bottom: 0.35rem;
+            word-break: break-all;
+        }
+        .result-error {
+            font-size: 0.85rem;
+            color: #ff8e8e;
+            padding: 0.5rem 0;
+        }
         .diagnosis {
-            font-size: 2.1rem;
+            font-size: 1.9rem;
             font-weight: 800;
-            text-align: center;
-            padding: 0.6rem 1rem;
-            border-radius: 10px;
-            margin-bottom: 1.5rem;
+            padding: 0.4rem 0.85rem;
+            border-radius: 8px;
+            display: inline-block;
             letter-spacing: 0.02em;
         }
-        .diagnosis.tumor   { color: #ff6b6b; background: rgba(255,107,107,0.1); }
+        .diagnosis.tumor    { color: #ff6b6b; background: rgba(255,107,107,0.1); }
         .diagnosis.no-tumor { color: #4ade80; background: rgba(74,222,128,0.08); }
         .metric { margin-bottom: 1.1rem; }
         .metric-label {
@@ -122,60 +163,217 @@
         .metric-value { font-size: 0.82rem; color: #9aadc4; margin-top: 0.3rem; }
         .histogram { margin-top: 1.25rem; }
         .histogram img { width: 100%; border-radius: 8px; display: block; }
+
+        /* History panel */
+        .history-panel {
+            width: 100%;
+            max-width: 600px;
+            margin-top: 2rem;
+        }
+        .history-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 1rem;
+        }
+        .history-title {
+            font-size: 1rem;
+            font-weight: 600;
+            color: #8892a4;
+            text-transform: uppercase;
+            letter-spacing: 0.07em;
+        }
+        .clear-btn {
+            padding: 0.3rem 0.75rem;
+            background: transparent;
+            border: 1px solid #3a4f6a;
+            border-radius: 6px;
+            color: #6a7f9a;
+            font-size: 0.78rem;
+            cursor: pointer;
+            transition: border-color 0.2s, color 0.2s;
+        }
+        .clear-btn:hover { border-color: #ff6b6b; color: #ff8e8e; }
+        .history-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(270px, 1fr));
+            gap: 0.75rem;
+        }
+
+        /* Compact history cards */
+        .history-card {
+            background: #1a2535;
+            border-radius: 10px;
+            padding: 0.85rem;
+            display: flex;
+            gap: 0.75rem;
+            border: 1px solid #24364e;
+            transition: border-color 0.2s;
+        }
+        .history-card:hover { border-color: #3a4f6a; }
+        .history-thumb {
+            width: 60px;
+            height: 60px;
+            flex-shrink: 0;
+            border-radius: 6px;
+            overflow: hidden;
+            background: #243344;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.5rem;
+        }
+        .history-thumb img { width: 100%; height: 100%; object-fit: cover; }
+        .history-details { flex: 1; min-width: 0; }
+        .history-filename {
+            font-size: 0.75rem;
+            color: #6a7f9a;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            margin-bottom: 0.3rem;
+        }
+        .diagnosis-badge {
+            display: inline-block;
+            font-size: 0.75rem;
+            font-weight: 700;
+            padding: 0.15rem 0.5rem;
+            border-radius: 4px;
+            margin-bottom: 0.35rem;
+        }
+        .diagnosis-badge.tumor    { color: #ff6b6b; background: rgba(255,107,107,0.12); }
+        .diagnosis-badge.no-tumor { color: #4ade80; background: rgba(74,222,128,0.1); }
+        .history-stats {
+            font-size: 0.72rem;
+            color: #8892a4;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+            margin-bottom: 0.3rem;
+        }
+        .history-ts { font-size: 0.68rem; color: #4a6070; margin-bottom: 0.4rem; }
+        .toggle-hist {
+            font-size: 0.7rem;
+            color: #4f86c6;
+            background: none;
+            border: none;
+            cursor: pointer;
+            padding: 0;
+            text-decoration: underline;
+        }
+        .toggle-hist:hover { color: #7eb8f7; }
+        .hist-expandable { margin-top: 0.5rem; }
+        .hist-expandable img { width: 100%; border-radius: 5px; }
+        .history-error {
+            font-size: 0.75rem;
+            color: #ff8e8e;
+            margin-top: 0.2rem;
+        }
     </style>
 </head>
 <body>
     <h1>Brain Tumor Detection</h1>
     <p class="subtitle">Monte Carlo Dropout &mdash; Uncertainty Quantification</p>
+    <div id="model-badge" class="model-badge"></div>
 
     <div class="card">
         <form id="upload-form">
             <div class="upload-area" id="drop-zone">
-                <input type="file" id="file-input" accept="image/jpeg,image/png">
+                <input type="file" id="file-input" accept="image/jpeg,image/png" multiple>
                 <span class="upload-icon">🧠</span>
                 <strong>Click to upload or drag &amp; drop</strong>
-                <p>Supports JPG &amp; PNG brain MRI images</p>
+                <p>JPG &amp; PNG &mdash; select multiple images for batch analysis</p>
                 <div id="file-name"></div>
-                <img id="preview" alt="Image preview">
             </div>
-            <button type="submit" class="btn" id="submit-btn" disabled>Analyse Image</button>
+            <button type="submit" class="btn" id="submit-btn" disabled>Analyse Image(s)</button>
         </form>
 
         <div class="spinner" id="spinner"></div>
         <div class="error"   id="error-box"></div>
+        <div id="results-container"></div>
+    </div>
 
-        <div class="results" id="results">
-            <div class="diagnosis" id="diagnosis"></div>
-
-            <div class="metric">
-                <div class="metric-label">Confidence &mdash; Mean Probability</div>
-                <div class="gauge-track">
-                    <div class="gauge-fill" id="gauge-fill" style="width:0%"></div>
-                </div>
-                <div class="metric-value" id="confidence-text"></div>
-            </div>
-
-            <div class="metric">
-                <div class="metric-label">Uncertainty &mdash; Standard Deviation (&sigma;)</div>
-                <div class="metric-value" id="uncertainty-text"></div>
-            </div>
-
-            <div class="histogram">
-                <div class="metric-label">MC Sample Distribution (100 forward passes)</div>
-                <img id="histogram-img" src="" alt="MC Dropout probability distribution">
-            </div>
+    <div id="history-panel" class="history-panel" style="display:none">
+        <div class="history-header">
+            <span class="history-title">Session History</span>
+            <button class="clear-btn" id="clear-history">Clear all</button>
         </div>
+        <div id="history-grid" class="history-grid"></div>
     </div>
 
     <script>
-        const fileInput  = document.getElementById('file-input');
-        const dropZone   = document.getElementById('drop-zone');
-        const fileNameEl = document.getElementById('file-name');
-        const preview    = document.getElementById('preview');
-        const submitBtn  = document.getElementById('submit-btn');
-        const spinner    = document.getElementById('spinner');
-        const errorBox   = document.getElementById('error-box');
-        const resultsEl  = document.getElementById('results');
+        const fileInput        = document.getElementById('file-input');
+        const dropZone         = document.getElementById('drop-zone');
+        const fileNameEl       = document.getElementById('file-name');
+        const submitBtn        = document.getElementById('submit-btn');
+        const spinner          = document.getElementById('spinner');
+        const errorBox         = document.getElementById('error-box');
+        const resultsContainer = document.getElementById('results-container');
+        const historyPanel     = document.getElementById('history-panel');
+        const historyGrid      = document.getElementById('history-grid');
+        const modelBadge       = document.getElementById('model-badge');
+
+        const COOKIE_NAME      = 'mc_uq_history';
+        const COOKIE_MAX_ITEMS = 25;   // keep well under the 4 KB cookie limit
+
+        let selectedFiles  = [];
+        let fileThumbnails = [];   // object URLs keyed by index
+
+        // ── Cookie helpers ────────────────────────────────────────────────
+        function readHistoryCookie() {
+            const match = document.cookie.split('; ').find(r => r.startsWith(COOKIE_NAME + '='));
+            if (!match) return [];
+            try { return JSON.parse(decodeURIComponent(match.split('=').slice(1).join('='))); }
+            catch (_) { return []; }
+        }
+
+        function saveHistoryCookie() {
+            // Only persist lightweight fields — no thumbnailSrc / histogram_b64
+            const slim = sessionHistory.slice(0, COOKIE_MAX_ITEMS).map(
+                ({ filename, prediction, mean_probability, uncertainty, error, timestamp }) =>
+                    ({ filename, prediction, mean_probability, uncertainty, error, timestamp })
+            );
+            const value = encodeURIComponent(JSON.stringify(slim));
+            // 1-year expiry, SameSite=Lax
+            document.cookie = `${COOKIE_NAME}=${value}; max-age=31536000; path=/; SameSite=Lax`;
+        }
+
+        function clearHistoryCookie() {
+            document.cookie = `${COOKIE_NAME}=; max-age=0; path=/; SameSite=Lax`;
+        }
+
+        // ── Bootstrap history from cookie ─────────────────────────────────
+        // Items restored from cookie have no thumbnailSrc / histogram_b64
+        const sessionHistory = readHistoryCookie();
+        updateHistory();   // show persisted history immediately on load
+
+        // ── Model info badge ─────────────────────────────────────────────
+        (async () => {
+            try {
+                const res = await fetch('/model/info');
+                if (!res.ok) return;
+                const d = await res.json();
+                const dt = new Date(d.loaded_at).toLocaleTimeString();
+                modelBadge.innerHTML =
+                    `Model: <span>${escHtml(d.name)}</span> &nbsp;·&nbsp; ${d.size_mb} MB &nbsp;·&nbsp; loaded ${dt}`;
+                modelBadge.style.display = 'inline-block';
+            } catch (_) {}
+        })();
+
+        // ── File selection ────────────────────────────────────────────────
+        function setFiles(files) {
+            fileThumbnails.forEach(u => URL.revokeObjectURL(u));
+            selectedFiles  = Array.from(files);
+            fileThumbnails = selectedFiles.map(f => URL.createObjectURL(f));
+
+            fileNameEl.textContent = selectedFiles.length === 1
+                ? selectedFiles[0].name
+                : `${selectedFiles.length} images selected`;
+
+            submitBtn.disabled = false;
+            resultsContainer.innerHTML = '';
+            errorBox.style.display = 'none';
+        }
 
         dropZone.addEventListener('click', () => fileInput.click());
         dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('dragover'); });
@@ -183,67 +381,179 @@
         dropZone.addEventListener('drop', e => {
             e.preventDefault();
             dropZone.classList.remove('dragover');
-            if (e.dataTransfer.files.length) setFile(e.dataTransfer.files[0]);
+            if (e.dataTransfer.files.length) setFiles(e.dataTransfer.files);
         });
-        fileInput.addEventListener('change', () => { if (fileInput.files.length) setFile(fileInput.files[0]); });
+        fileInput.addEventListener('change', () => { if (fileInput.files.length) setFiles(fileInput.files); });
 
-        function setFile(file) {
-            fileNameEl.textContent = file.name;
-            preview.src = URL.createObjectURL(file);
-            preview.style.display = 'block';
-            submitBtn.disabled = false;
-            resultsEl.style.display = 'none';
-            errorBox.style.display = 'none';
-        }
-
+        // ── Submit ────────────────────────────────────────────────────────
         document.getElementById('upload-form').addEventListener('submit', async e => {
             e.preventDefault();
-            if (!fileInput.files.length) return;
+            if (!selectedFiles.length) return;
 
             submitBtn.disabled = true;
             spinner.style.display = 'block';
             errorBox.style.display = 'none';
-            resultsEl.style.display = 'none';
+            resultsContainer.innerHTML = '';
 
-            const body = new FormData();
-            body.append('file', fileInput.files[0]);
-
+            let results;
             try {
-                const res  = await fetch('/predict', { method: 'POST', body });
-                const data = await res.json();
-                if (!res.ok) { showError(data.detail || 'Prediction failed.'); return; }
-                showResults(data);
+                const body = new FormData();
+                if (selectedFiles.length === 1) {
+                    body.append('file', selectedFiles[0]);
+                    const res  = await fetch('/predict', { method: 'POST', body });
+                    const data = await res.json();
+                    if (!res.ok) { showError(data.detail || 'Prediction failed.'); return; }
+                    results = [{ filename: selectedFiles[0].name, ...data }];
+                } else {
+                    selectedFiles.forEach(f => body.append('files', f));
+                    const res  = await fetch('/predict/batch', { method: 'POST', body });
+                    const data = await res.json();
+                    if (!res.ok) { showError(data.detail || 'Batch prediction failed.'); return; }
+                    results = data;
+                }
             } catch (_) {
                 showError('Network error — is the server running?');
+                return;
             } finally {
                 spinner.style.display = 'none';
                 submitBtn.disabled = false;
             }
+
+            const now = new Date().toISOString();
+            results.forEach((item, i) => {
+                const thumb = fileThumbnails[i] || '';
+                renderFullCard(item, thumb, resultsContainer);
+                sessionHistory.unshift({ ...item, thumbnailSrc: thumb, timestamp: now });
+            });
+
+            saveHistoryCookie();
+            updateHistory();
+            resultsContainer.firstElementChild?.scrollIntoView({ behavior: 'smooth', block: 'start' });
         });
 
+        // ── Render: full result card ──────────────────────────────────────
+        function renderFullCard(item, thumbSrc, container) {
+            const div = document.createElement('div');
+            div.className = 'result-card';
+
+            if (item.error) {
+                div.innerHTML = `
+                    <div class="result-filename">${escHtml(item.filename)}</div>
+                    <div class="result-error">${escHtml(item.error)}</div>`;
+                container.appendChild(div);
+                return;
+            }
+
+            const isTumor  = item.prediction === 'Tumor';
+            const cls      = isTumor ? 'tumor' : 'no-tumor';
+            const pct      = (item.mean_probability * 100).toFixed(1);
+
+            div.innerHTML = `
+                <div class="result-header">
+                    ${thumbSrc ? `<img class="result-thumb" src="${escHtml(thumbSrc)}" alt="">` : ''}
+                    <div>
+                        <div class="result-filename">${escHtml(item.filename)}</div>
+                        <div class="diagnosis ${cls}">${escHtml(item.prediction)}</div>
+                    </div>
+                </div>
+                <div class="metric">
+                    <div class="metric-label">Confidence &mdash; Mean Probability</div>
+                    <div class="gauge-track">
+                        <div class="gauge-fill" style="width:${pct}%"></div>
+                    </div>
+                    <div class="metric-value">${pct}% &nbsp;(${item.mean_probability.toFixed(4)})</div>
+                </div>
+                <div class="metric">
+                    <div class="metric-label">Uncertainty &mdash; Standard Deviation (&sigma;)</div>
+                    <div class="metric-value">&sigma; = ${item.uncertainty.toFixed(4)}</div>
+                </div>
+                ${item.histogram_b64 ? `
+                <div class="histogram">
+                    <div class="metric-label">MC Sample Distribution (100 forward passes)</div>
+                    <img src="data:image/png;base64,${item.histogram_b64}" alt="Distribution">
+                </div>` : ''}`;
+
+            container.appendChild(div);
+        }
+
+        // ── Render: compact history card ──────────────────────────────────
+        function renderHistoryCard(item) {
+            const div = document.createElement('div');
+            div.className = 'history-card';
+
+            const thumb = item.thumbnailSrc
+                ? `<img src="${escHtml(item.thumbnailSrc)}" alt="">`
+                : '🧠';
+
+            if (item.error) {
+                div.innerHTML = `
+                    <div class="history-thumb">${thumb}</div>
+                    <div class="history-details">
+                        <div class="history-filename" title="${escHtml(item.filename)}">${escHtml(item.filename)}</div>
+                        <div class="history-error">${escHtml(item.error)}</div>
+                        <div class="history-ts">${new Date(item.timestamp).toLocaleTimeString()}</div>
+                    </div>`;
+                return div;
+            }
+
+            const cls = item.prediction === 'Tumor' ? 'tumor' : 'no-tumor';
+            const pct = (item.mean_probability * 100).toFixed(1);
+
+            div.innerHTML = `
+                <div class="history-thumb">${thumb}</div>
+                <div class="history-details">
+                    <div class="history-filename" title="${escHtml(item.filename)}">${escHtml(item.filename)}</div>
+                    <span class="diagnosis-badge ${cls}">${escHtml(item.prediction)}</span>
+                    <div class="history-stats">
+                        <span>Confidence: ${pct}%</span>
+                        <span>&sigma; = ${item.uncertainty.toFixed(4)}</span>
+                    </div>
+                    <div class="history-ts">${new Date(item.timestamp).toLocaleTimeString()}</div>
+                    ${item.histogram_b64
+                        ? `<button class="toggle-hist">Show histogram</button>
+                           <div class="hist-expandable" style="display:none">
+                               <img src="data:image/png;base64,${item.histogram_b64}" alt="Distribution">
+                           </div>`
+                        : ''}
+                </div>`;
+
+            div.querySelector('.toggle-hist')?.addEventListener('click', function () {
+                const expandable = div.querySelector('.hist-expandable');
+                const open = expandable.style.display !== 'none';
+                expandable.style.display = open ? 'none' : 'block';
+                this.textContent = open ? 'Show histogram' : 'Hide histogram';
+            });
+
+            return div;
+        }
+
+        // ── History panel ─────────────────────────────────────────────────
+        function updateHistory() {
+            if (!sessionHistory.length) {
+                historyPanel.style.display = 'none';
+                return;
+            }
+            historyPanel.style.display = 'block';
+            historyGrid.innerHTML = '';
+            sessionHistory.forEach(item => historyGrid.appendChild(renderHistoryCard(item)));
+        }
+
+        document.getElementById('clear-history').addEventListener('click', () => {
+            sessionHistory.length = 0;
+            clearHistoryCookie();
+            updateHistory();
+        });
+
+        // ── Helpers ───────────────────────────────────────────────────────
         function showError(msg) {
             errorBox.textContent = msg;
             errorBox.style.display = 'block';
         }
 
-        function showResults(data) {
-            const diag = document.getElementById('diagnosis');
-            diag.textContent = data.prediction;
-            diag.className   = 'diagnosis ' + (data.prediction === 'Tumor' ? 'tumor' : 'no-tumor');
-
-            const pct = (data.mean_probability * 100).toFixed(1);
-            document.getElementById('gauge-fill').style.width = pct + '%';
-            document.getElementById('confidence-text').textContent =
-                pct + '%  (' + data.mean_probability.toFixed(4) + ')';
-
-            document.getElementById('uncertainty-text').textContent =
-                'σ = ' + data.uncertainty.toFixed(4);
-
-            document.getElementById('histogram-img').src =
-                'data:image/png;base64,' + data.histogram_b64;
-
-            resultsEl.style.display = 'block';
-            resultsEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        function escHtml(s) {
+            return String(s)
+                .replace(/&/g, '&amp;').replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
         }
     </script>
 </body>

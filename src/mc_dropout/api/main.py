@@ -1,5 +1,6 @@
 from __future__ import annotations
 from contextlib import asynccontextmanager
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import AsyncGenerator
 
@@ -34,6 +35,12 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     app.state.model = model
     app.state.config = config
     app.state.device = device
+    app.state.model_info = {
+        "name": model_path.name,
+        "path": str(model_path),
+        "size_mb": round(model_path.stat().st_size / 1_048_576, 2),
+        "loaded_at": datetime.now(timezone.utc).isoformat(),
+    }
 
     yield
 
