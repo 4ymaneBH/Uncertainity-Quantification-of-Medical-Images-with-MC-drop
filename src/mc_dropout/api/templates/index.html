@@ -1,560 +1,906 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Brain Tumor Detection — MC Dropout UQ</title>
-    <style>
-        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-        body {
-            font-family: 'Segoe UI', system-ui, sans-serif;
-            background: #0f1923;
-            color: #e8eaf0;
-            min-height: 100vh;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            padding: 2.5rem 1rem 4rem;
-        }
-        h1 { font-size: 1.75rem; font-weight: 700; color: #7eb8f7; }
-        .subtitle { color: #8892a4; font-size: 0.875rem; margin-top: 0.25rem; }
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>NeuroScan — Brain Tumor Detection</title>
 
-        /* Model version badge */
-        .model-badge {
-            display: none;
-            margin-top: 0.75rem;
-            margin-bottom: 1.75rem;
-            padding: 0.3rem 0.85rem;
-            background: #1a2535;
-            border: 1px solid #2a3f58;
-            border-radius: 999px;
-            font-size: 0.78rem;
-            color: #6a9fd8;
-            letter-spacing: 0.02em;
-        }
-        .model-badge span { color: #4ade80; font-weight: 600; }
+  <!-- Fonts: Figtree (body) + DM Mono (numbers) -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Figtree:wght@300;400;500;600;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet" />
 
-        /* Upload card */
-        .card {
-            background: #1a2535;
-            border-radius: 14px;
-            padding: 2rem;
-            width: 100%;
-            max-width: 600px;
-            box-shadow: 0 6px 32px rgba(0,0,0,0.5);
-        }
-        .upload-area {
-            border: 2px dashed #3a4f6a;
-            border-radius: 10px;
-            padding: 2.5rem 1.5rem;
-            text-align: center;
-            cursor: pointer;
-            transition: border-color 0.2s, background 0.2s;
-        }
-        .upload-area:hover, .upload-area.dragover {
-            border-color: #7eb8f7;
-            background: rgba(126,184,247,0.04);
-        }
-        .upload-area input[type="file"] { display: none; }
-        .upload-icon { font-size: 2.75rem; display: block; margin-bottom: 0.6rem; }
-        .upload-area strong { font-size: 1rem; }
-        .upload-area p { color: #8892a4; font-size: 0.85rem; margin-top: 0.35rem; }
-        #file-name { margin-top: 0.6rem; color: #7eb8f7; font-size: 0.82rem; min-height: 1.1em; }
-        .btn {
-            display: block;
-            width: 100%;
-            margin-top: 1.25rem;
-            padding: 0.9rem;
-            background: #2d6fca;
-            color: #fff;
-            border: none;
-            border-radius: 10px;
-            font-size: 1rem;
-            font-weight: 600;
-            cursor: pointer;
-            transition: background 0.2s;
-        }
-        .btn:hover:not(:disabled) { background: #3a84e8; }
-        .btn:disabled { background: #1e2e42; color: #4a6070; cursor: not-allowed; }
-        .spinner {
-            display: none;
-            margin: 1.25rem auto 0;
-            width: 34px; height: 34px;
-            border: 3px solid #2d3f58;
-            border-top-color: #7eb8f7;
-            border-radius: 50%;
-            animation: spin 0.75s linear infinite;
-        }
-        @keyframes spin { to { transform: rotate(360deg); } }
-        .error {
-            display: none;
-            margin-top: 1rem;
-            padding: 0.85rem 1rem;
-            background: rgba(255,107,107,0.08);
-            border: 1px solid #ff6b6b;
-            border-radius: 8px;
-            color: #ff8e8e;
-            font-size: 0.875rem;
-        }
+  <!-- React 18 + Babel CDN -->
+  <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 
-        /* Full result cards (current batch) */
-        #results-container { margin-top: 0; }
-        .result-card {
-            margin-top: 1.75rem;
-            padding-top: 1.5rem;
-            border-top: 1px solid #24364e;
-        }
-        .result-card + .result-card { margin-top: 1.25rem; }
-        .result-header {
-            display: flex;
-            align-items: flex-start;
-            gap: 1rem;
-            margin-bottom: 1.25rem;
-        }
-        .result-thumb {
-            width: 72px;
-            height: 72px;
-            object-fit: cover;
-            border-radius: 8px;
-            flex-shrink: 0;
-            border: 1px solid #2a3f58;
-        }
-        .result-filename {
-            font-size: 0.8rem;
-            color: #6a7f9a;
-            margin-bottom: 0.35rem;
-            word-break: break-all;
-        }
-        .result-error {
-            font-size: 0.85rem;
-            color: #ff8e8e;
-            padding: 0.5rem 0;
-        }
-        .diagnosis {
-            font-size: 1.9rem;
-            font-weight: 800;
-            padding: 0.4rem 0.85rem;
-            border-radius: 8px;
-            display: inline-block;
-            letter-spacing: 0.02em;
-        }
-        .diagnosis.tumor    { color: #ff6b6b; background: rgba(255,107,107,0.1); }
-        .diagnosis.no-tumor { color: #4ade80; background: rgba(74,222,128,0.08); }
-        .metric { margin-bottom: 1.1rem; }
-        .metric-label {
-            font-size: 0.7rem;
-            text-transform: uppercase;
-            letter-spacing: 0.07em;
-            color: #6a7f9a;
-            margin-bottom: 0.4rem;
-        }
-        .gauge-track {
-            height: 10px;
-            background: #243344;
-            border-radius: 999px;
-            overflow: hidden;
-        }
-        .gauge-fill {
-            height: 100%;
-            border-radius: 999px;
-            background: linear-gradient(90deg, #1e5fa8, #7eb8f7);
-            transition: width 0.55s cubic-bezier(0.4,0,0.2,1);
-        }
-        .metric-value { font-size: 0.82rem; color: #9aadc4; margin-top: 0.3rem; }
-        .histogram { margin-top: 1.25rem; }
-        .histogram img { width: 100%; border-radius: 8px; display: block; }
+  <style>
+    /* ── Design tokens ───────────────────────────────────────────── */
+    :root {
+      --bg-base:     #0d1117;
+      --bg-surface:  #161b22;
+      --bg-elevated: #1c2433;
+      --bg-hover:    #1f2d3d;
+      --border:      #21303f;
+      --border-subtle: #1a2739;
 
-        /* History panel */
-        .history-panel {
-            width: 100%;
-            max-width: 600px;
-            margin-top: 2rem;
-        }
-        .history-header {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            margin-bottom: 1rem;
-        }
-        .history-title {
-            font-size: 1rem;
-            font-weight: 600;
-            color: #8892a4;
-            text-transform: uppercase;
-            letter-spacing: 0.07em;
-        }
-        .clear-btn {
-            padding: 0.3rem 0.75rem;
-            background: transparent;
-            border: 1px solid #3a4f6a;
-            border-radius: 6px;
-            color: #6a7f9a;
-            font-size: 0.78rem;
-            cursor: pointer;
-            transition: border-color 0.2s, color 0.2s;
-        }
-        .clear-btn:hover { border-color: #ff6b6b; color: #ff8e8e; }
-        .history-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(270px, 1fr));
-            gap: 0.75rem;
-        }
+      --accent:      #3b82f6;
+      --accent-dim:  rgba(59,130,246,0.1);
+      --accent-border: rgba(59,130,246,0.25);
 
-        /* Compact history cards */
-        .history-card {
-            background: #1a2535;
-            border-radius: 10px;
-            padding: 0.85rem;
-            display: flex;
-            gap: 0.75rem;
-            border: 1px solid #24364e;
-            transition: border-color 0.2s;
-        }
-        .history-card:hover { border-color: #3a4f6a; }
-        .history-thumb {
-            width: 60px;
-            height: 60px;
-            flex-shrink: 0;
-            border-radius: 6px;
-            overflow: hidden;
-            background: #243344;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 1.5rem;
-        }
-        .history-thumb img { width: 100%; height: 100%; object-fit: cover; }
-        .history-details { flex: 1; min-width: 0; }
-        .history-filename {
-            font-size: 0.75rem;
-            color: #6a7f9a;
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-            margin-bottom: 0.3rem;
-        }
-        .diagnosis-badge {
-            display: inline-block;
-            font-size: 0.75rem;
-            font-weight: 700;
-            padding: 0.15rem 0.5rem;
-            border-radius: 4px;
-            margin-bottom: 0.35rem;
-        }
-        .diagnosis-badge.tumor    { color: #ff6b6b; background: rgba(255,107,107,0.12); }
-        .diagnosis-badge.no-tumor { color: #4ade80; background: rgba(74,222,128,0.1); }
-        .history-stats {
-            font-size: 0.72rem;
-            color: #8892a4;
-            display: flex;
-            flex-wrap: wrap;
-            gap: 0.5rem;
-            margin-bottom: 0.3rem;
-        }
-        .history-ts { font-size: 0.68rem; color: #4a6070; margin-bottom: 0.4rem; }
-        .toggle-hist {
-            font-size: 0.7rem;
-            color: #4f86c6;
-            background: none;
-            border: none;
-            cursor: pointer;
-            padding: 0;
-            text-decoration: underline;
-        }
-        .toggle-hist:hover { color: #7eb8f7; }
-        .hist-expandable { margin-top: 0.5rem; }
-        .hist-expandable img { width: 100%; border-radius: 5px; }
-        .history-error {
-            font-size: 0.75rem;
-            color: #ff8e8e;
-            margin-top: 0.2rem;
-        }
-    </style>
+      --positive:    #22c55e;
+      --positive-dim: rgba(34,197,94,0.1);
+      --danger:      #f87171;
+      --danger-dim:  rgba(248,113,113,0.08);
+      --warning:     #fb923c;
+      --warning-dim: rgba(251,146,60,0.08);
+
+      --text-primary:   #e6edf3;
+      --text-secondary: #7d8590;
+      --text-muted:     #484f58;
+
+      --radius-sm:  6px;
+      --radius-md:  10px;
+      --radius-lg:  14px;
+      --radius-xl:  18px;
+    }
+
+    /* ── Reset ───────────────────────────────────────────────────── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html { background: var(--bg-base); scroll-behavior: smooth; }
+    body {
+      font-family: 'Figtree', system-ui, -apple-system, sans-serif;
+      background: var(--bg-base);
+      color: var(--text-primary);
+      min-height: 100vh;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+    }
+    button { font-family: inherit; }
+    img { display: block; }
+
+    /* ── Utilities ───────────────────────────────────────────────── */
+    .mono { font-family: 'DM Mono', 'Consolas', monospace; }
+    .label {
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.07em;
+      color: var(--text-secondary);
+    }
+
+    /* ── Scrollbar ───────────────────────────────────────────────── */
+    ::-webkit-scrollbar { width: 5px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+
+    /* ── Keyframes ───────────────────────────────────────────────── */
+    @keyframes gauge-in {
+      from { width: 0 !important; }
+    }
+    @keyframes shimmer {
+      0%   { background-position: -400px 0; }
+      100% { background-position: 400px 0; }
+    }
+    @keyframes fade-up {
+      from { opacity: 0; transform: translateY(10px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+    @keyframes pulse-dot {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50%       { opacity: 0.4; transform: scale(0.85); }
+    }
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    .fade-up    { animation: fade-up 0.35s cubic-bezier(0.16,1,0.3,1) both; }
+    .gauge-anim { animation: gauge-in 0.7s cubic-bezier(0.16,1,0.3,1) both; }
+
+    .shimmer-block {
+      background: linear-gradient(90deg,
+        var(--bg-elevated) 0%, var(--bg-hover) 40%, var(--bg-elevated) 80%);
+      background-size: 800px 100%;
+      animation: shimmer 1.6s infinite linear;
+      border-radius: var(--radius-sm);
+    }
+
+    /* ── Focus ring ──────────────────────────────────────────────── */
+    :focus-visible {
+      outline: 2px solid var(--accent);
+      outline-offset: 2px;
+    }
+
+    /* ── Responsive grid ─────────────────────────────────────────── */
+    .layout-grid {
+      display: grid;
+      grid-template-columns: 320px 1fr;
+      gap: 20px;
+      align-items: start;
+    }
+    @media (max-width: 820px) {
+      .layout-grid { grid-template-columns: 1fr; }
+      .upload-sticky { position: static !important; top: auto !important; }
+    }
+    @media (max-width: 480px) {
+      .page-wrap { padding: 16px 14px !important; }
+      h1 { font-size: 18px !important; }
+    }
+  </style>
 </head>
 <body>
-    <h1>Brain Tumor Detection</h1>
-    <p class="subtitle">Monte Carlo Dropout &mdash; Uncertainty Quantification</p>
-    <div id="model-badge" class="model-badge"></div>
+  <div id="root"></div>
 
-    <div class="card">
-        <form id="upload-form">
-            <div class="upload-area" id="drop-zone">
-                <input type="file" id="file-input" accept="image/jpeg,image/png" multiple>
-                <span class="upload-icon">🧠</span>
-                <strong>Click to upload or drag &amp; drop</strong>
-                <p>JPG &amp; PNG &mdash; select multiple images for batch analysis</p>
-                <div id="file-name"></div>
+  <script type="text/babel">
+    {% raw %}
+    const { useState, useEffect, useRef, useCallback, useId } = React;
+
+    /* ─────────────────────────────────────────────────────────────
+       SVG Icon library (inline, no external dependency)
+    ───────────────────────────────────────────────────────────── */
+    const ScanIcon = () => (
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none"
+        stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"
+        aria-hidden="true">
+        <path d="M3 7V5a2 2 0 0 1 2-2h2"/>
+        <path d="M17 3h2a2 2 0 0 1 2 2v2"/>
+        <path d="M21 17v2a2 2 0 0 1-2 2h-2"/>
+        <path d="M7 21H5a2 2 0 0 1-2-2v-2"/>
+        <rect x="7" y="7" width="10" height="10" rx="2"/>
+      </svg>
+    );
+
+    const UploadIcon = () => (
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none"
+        stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"
+        aria-hidden="true">
+        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+        <polyline points="17 8 12 3 7 8"/>
+        <line x1="12" y1="3" x2="12" y2="15"/>
+      </svg>
+    );
+
+    const XIcon = ({ size = 14 }) => (
+      <svg width={size} height={size} viewBox="0 0 24 24" fill="none"
+        stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" aria-hidden="true">
+        <line x1="18" y1="6" x2="6" y2="18"/>
+        <line x1="6" y1="6" x2="18" y2="18"/>
+      </svg>
+    );
+
+    const ClockIcon = () => (
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none"
+        stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
+        <circle cx="12" cy="12" r="10"/>
+        <polyline points="12 6 12 12 16 14"/>
+      </svg>
+    );
+
+    const TrashIcon = () => (
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none"
+        stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
+        <polyline points="3 6 5 6 21 6"/>
+        <path d="M19 6l-1 14H6L5 6"/>
+        <path d="M10 11v6"/><path d="M14 11v6"/>
+        <path d="M9 6V4h6v2"/>
+      </svg>
+    );
+
+    const ChevronIcon = ({ open }) => (
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none"
+        stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" aria-hidden="true"
+        style={{ transform: open ? 'rotate(180deg)' : 'rotate(0)', transition: 'transform 0.2s ease' }}>
+        <polyline points="6 9 12 15 18 9"/>
+      </svg>
+    );
+
+    const InfoIcon = () => (
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none"
+        stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
+        <circle cx="12" cy="12" r="10"/>
+        <line x1="12" y1="8" x2="12" y2="12"/>
+        <line x1="12" y1="16" x2="12.01" y2="16"/>
+      </svg>
+    );
+
+    /* ─────────────────────────────────────────────────────────────
+       Helpers
+    ───────────────────────────────────────────────────────────── */
+    const fmt  = (n, d=1) => (n * 100).toFixed(d);
+    const fmtT = iso => new Date(iso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+    function sigmaLevel(s) {
+      if (s < 0.05) return { label: 'Low',      color: '#22c55e', bg: 'rgba(34,197,94,0.1)',    desc: 'High model confidence' };
+      if (s < 0.15) return { label: 'Moderate', color: '#fb923c', bg: 'rgba(251,146,60,0.1)',   desc: 'Uncertain, review advised' };
+      return              { label: 'High',     color: '#f87171', bg: 'rgba(248,113,113,0.12)', desc: 'Flag for clinical review' };
+    }
+
+    function cookieGet(key) {
+      const m = document.cookie.split('; ').find(r => r.startsWith(key + '='));
+      try { return m ? JSON.parse(decodeURIComponent(m.split('=').slice(1).join('='))) : null; }
+      catch { return null; }
+    }
+    function cookieSet(key, val) {
+      document.cookie = `${key}=${encodeURIComponent(JSON.stringify(val))}; max-age=31536000; path=/; SameSite=Lax`;
+    }
+    function cookieDel(key) {
+      document.cookie = `${key}=; max-age=0; path=/`;
+    }
+
+    /* ─────────────────────────────────────────────────────────────
+       LiveDot
+    ───────────────────────────────────────────────────────────── */
+    function LiveDot() {
+      return (
+        <span style={{ position: 'relative', display: 'inline-flex', width: 7, height: 7, flexShrink: 0 }}
+          aria-label="Server online">
+          <span style={{
+            position: 'absolute', inset: 0, borderRadius: '50%',
+            background: 'var(--positive)', opacity: 0.5,
+            animation: 'pulse-dot 2s ease-in-out infinite',
+          }} />
+          <span style={{ width: 7, height: 7, borderRadius: '50%', background: 'var(--positive)', display: 'block' }} />
+        </span>
+      );
+    }
+
+    /* ─────────────────────────────────────────────────────────────
+       Header
+    ───────────────────────────────────────────────────────────── */
+    function Header({ modelInfo }) {
+      return (
+        <header role="banner" style={{
+          borderBottom: '1px solid var(--border)',
+          background: 'rgba(13,17,23,0.92)',
+          backdropFilter: 'blur(10px)',
+          position: 'sticky', top: 0, zIndex: 20,
+        }}>
+          <div style={{
+            maxWidth: 1240, margin: '0 auto', padding: '0 24px',
+            height: 52, display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <span style={{ color: 'var(--accent)', display: 'flex' }}><ScanIcon /></span>
+              <span style={{ fontSize: 15, fontWeight: 700, letterSpacing: '-0.02em' }}>NeuroScan</span>
+              <span style={{
+                fontSize: 10, fontWeight: 600, letterSpacing: '0.06em',
+                textTransform: 'uppercase', color: 'var(--text-secondary)',
+                border: '1px solid var(--border)', borderRadius: 20,
+                padding: '2px 8px',
+              }}>MC Dropout UQ</span>
             </div>
-            <button type="submit" class="btn" id="submit-btn" disabled>Analyse Image(s)</button>
-        </form>
 
-        <div class="spinner" id="spinner"></div>
-        <div class="error"   id="error-box"></div>
-        <div id="results-container"></div>
-    </div>
+            {modelInfo ? (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <LiveDot />
+                <span className="mono" style={{ fontSize: 11, color: 'var(--text-secondary)' }}>
+                  {modelInfo.name}
+                </span>
+                <span style={{ color: 'var(--border)', fontSize: 14 }}>·</span>
+                <span className="mono" style={{ fontSize: 11, color: 'var(--text-secondary)' }}>
+                  {modelInfo.size_mb} MB
+                </span>
+              </div>
+            ) : (
+              <div style={{ width: 180, height: 14 }} className="shimmer-block" />
+            )}
+          </div>
+        </header>
+      );
+    }
 
-    <div id="history-panel" class="history-panel" style="display:none">
-        <div class="history-header">
-            <span class="history-title">Session History</span>
-            <button class="clear-btn" id="clear-history">Clear all</button>
+    /* ─────────────────────────────────────────────────────────────
+       DropZone
+    ───────────────────────────────────────────────────────────── */
+    function DropZone({ onFiles, disabled }) {
+      const [drag, setDrag] = useState(false);
+      const inputRef = useRef();
+      const labelId = 'dz-label';
+
+      const handle = useCallback((raw) => {
+        if (disabled || !raw.length) return;
+        onFiles(Array.from(raw).filter(f => f.type === 'image/jpeg' || f.type === 'image/png'));
+      }, [onFiles, disabled]);
+
+      return (
+        <div
+          role="button"
+          tabIndex={disabled ? -1 : 0}
+          aria-labelledby={labelId}
+          aria-disabled={disabled}
+          onClick={() => !disabled && inputRef.current?.click()}
+          onKeyDown={e => (e.key === 'Enter' || e.key === ' ') && !disabled && inputRef.current?.click()}
+          onDragOver={e => { e.preventDefault(); setDrag(true); }}
+          onDragLeave={() => setDrag(false)}
+          onDrop={e => { e.preventDefault(); setDrag(false); handle(e.dataTransfer.files); }}
+          style={{
+            border: `1.5px dashed ${drag ? 'var(--accent)' : 'var(--border)'}`,
+            borderRadius: 'var(--radius-lg)',
+            padding: '32px 20px',
+            textAlign: 'center',
+            cursor: disabled ? 'not-allowed' : 'pointer',
+            background: drag ? 'var(--accent-dim)' : 'transparent',
+            transition: 'all 0.18s ease',
+            userSelect: 'none',
+          }}
+        >
+          <input
+            ref={inputRef}
+            type="file"
+            accept="image/jpeg,image/png"
+            multiple
+            style={{ display: 'none' }}
+            onChange={e => handle(e.target.files)}
+            aria-hidden="true"
+          />
+          <div style={{ color: drag ? 'var(--accent)' : 'var(--text-muted)', marginBottom: 10, display: 'flex', justifyContent: 'center' }}>
+            <UploadIcon />
+          </div>
+          <div id={labelId} style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)', marginBottom: 3 }}>
+            Drop MRI images here
+          </div>
+          <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
+            JPEG or PNG — single or batch upload
+          </div>
         </div>
-        <div id="history-grid" class="history-grid"></div>
-    </div>
+      );
+    }
 
-    <script>
-        const fileInput        = document.getElementById('file-input');
-        const dropZone         = document.getElementById('drop-zone');
-        const fileNameEl       = document.getElementById('file-name');
-        const submitBtn        = document.getElementById('submit-btn');
-        const spinner          = document.getElementById('spinner');
-        const errorBox         = document.getElementById('error-box');
-        const resultsContainer = document.getElementById('results-container');
-        const historyPanel     = document.getElementById('history-panel');
-        const historyGrid      = document.getElementById('history-grid');
-        const modelBadge       = document.getElementById('model-badge');
+    /* ─────────────────────────────────────────────────────────────
+       FileList
+    ───────────────────────────────────────────────────────────── */
+    function FileList({ files, onRemove }) {
+      if (!files.length) return null;
+      return (
+        <ul role="list" aria-label="Selected files" style={{ marginTop: 10, display: 'flex', flexDirection: 'column', gap: 5 }}>
+          {files.map((f, i) => (
+            <li key={i} style={{
+              display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+              padding: '7px 10px', borderRadius: 'var(--radius-sm)',
+              background: 'var(--bg-elevated)', border: '1px solid var(--border-subtle)',
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
+                <span className="mono" style={{ fontSize: 11, color: 'var(--text-muted)', flexShrink: 0 }}>{i + 1}</span>
+                <span style={{ fontSize: 12, color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {f.name}
+                </span>
+              </div>
+              <button
+                aria-label={`Remove ${f.name}`}
+                onClick={() => onRemove(i)}
+                style={{
+                  background: 'none', border: 'none', cursor: 'pointer',
+                  color: 'var(--text-secondary)', padding: '4px', borderRadius: 4, flexShrink: 0,
+                  display: 'flex', alignItems: 'center', transition: 'color 0.15s',
+                }}
+                onMouseOver={e => e.currentTarget.style.color = 'var(--danger)'}
+                onMouseOut={e => e.currentTarget.style.color = 'var(--text-secondary)'}
+              >
+                <XIcon />
+              </button>
+            </li>
+          ))}
+        </ul>
+      );
+    }
 
-        const COOKIE_NAME      = 'mc_uq_history';
-        const COOKIE_MAX_ITEMS = 25;   // keep well under the 4 KB cookie limit
+    /* ─────────────────────────────────────────────────────────────
+       SubmitButton
+    ───────────────────────────────────────────────────────────── */
+    function SubmitButton({ loading, count, onClick }) {
+      const inactive = !count || loading;
+      return (
+        <button
+          onClick={onClick}
+          disabled={inactive}
+          aria-busy={loading}
+          style={{
+            width: '100%', marginTop: 14, padding: '11px 20px',
+            borderRadius: 'var(--radius-md)', fontSize: 14, fontWeight: 600,
+            cursor: inactive ? 'not-allowed' : 'pointer',
+            border: 'none', letterSpacing: '-0.01em',
+            background: inactive ? 'var(--bg-elevated)' : 'var(--accent)',
+            color: inactive ? 'var(--text-muted)' : '#fff',
+            transition: 'all 0.15s ease',
+            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+          }}
+          onMouseOver={e => { if (!inactive) e.currentTarget.style.background = '#2563eb'; }}
+          onMouseOut={e => { if (!inactive) e.currentTarget.style.background = 'var(--accent)'; }}
+          onMouseDown={e => { if (!inactive) e.currentTarget.style.transform = 'scale(0.985)'; }}
+          onMouseUp={e => { e.currentTarget.style.transform = 'scale(1)'; }}
+        >
+          {loading && (
+            <span style={{
+              width: 14, height: 14, border: '2px solid rgba(255,255,255,0.25)',
+              borderTopColor: '#fff', borderRadius: '50%',
+              animation: 'spin 0.7s linear infinite',
+            }} aria-hidden="true" />
+          )}
+          {loading ? 'Analysing...' : count > 1 ? `Analyse ${count} images` : 'Analyse image'}
+        </button>
+      );
+    }
 
-        let selectedFiles  = [];
-        let fileThumbnails = [];   // object URLs keyed by index
+    /* ─────────────────────────────────────────────────────────────
+       InfoPanel (how it works)
+    ───────────────────────────────────────────────────────────── */
+    function InfoPanel() {
+      const steps = [
+        ['100 passes', 'Image runs through the CNN 100 times with different dropout masks active.'],
+        ['Mean prob.', 'Average of 100 outputs = confidence score (how likely tumor is present).'],
+        ['Std dev (σ)', 'Spread of outputs = uncertainty. High σ means inconsistent predictions.'],
+      ];
+      return (
+        <details style={{
+          marginTop: 14, borderRadius: 'var(--radius-md)',
+          border: '1px solid var(--border-subtle)', overflow: 'hidden',
+        }}>
+          <summary style={{
+            cursor: 'pointer', userSelect: 'none',
+            padding: '10px 14px', fontSize: 12, fontWeight: 600,
+            color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: 6,
+            listStyle: 'none', background: 'var(--bg-elevated)',
+          }}>
+            <InfoIcon />
+            How MC Dropout works
+          </summary>
+          <div style={{ padding: '12px 14px', background: 'var(--bg-elevated)', borderTop: '1px solid var(--border-subtle)' }}>
+            {steps.map(([k, v]) => (
+              <div key={k} style={{ display: 'flex', gap: 10, marginBottom: 10 }}>
+                <span className="mono" style={{ fontSize: 11, color: 'var(--accent)', flexShrink: 0, fontWeight: 500, lineHeight: 1.7 }}>
+                  {k}
+                </span>
+                <span style={{ fontSize: 12, color: 'var(--text-secondary)', lineHeight: 1.65 }}>{v}</span>
+              </div>
+            ))}
+          </div>
+        </details>
+      );
+    }
 
-        // ── Cookie helpers ────────────────────────────────────────────────
-        function readHistoryCookie() {
-            const match = document.cookie.split('; ').find(r => r.startsWith(COOKIE_NAME + '='));
-            if (!match) return [];
-            try { return JSON.parse(decodeURIComponent(match.split('=').slice(1).join('='))); }
-            catch (_) { return []; }
+    /* ─────────────────────────────────────────────────────────────
+       ConfidenceGauge
+    ───────────────────────────────────────────────────────────── */
+    function ConfidenceGauge({ value }) {
+      const pct   = value * 100;
+      const color = value >= 0.7 ? 'var(--danger)' : value >= 0.4 ? 'var(--warning)' : 'var(--positive)';
+      return (
+        <div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 8 }}>
+            <span className="label">Confidence</span>
+            <span className="mono" style={{ fontSize: 22, fontWeight: 500, color, letterSpacing: '-0.03em', lineHeight: 1 }}>
+              {pct.toFixed(1)}<span style={{ fontSize: 12, color: 'var(--text-secondary)', fontWeight: 400 }}>%</span>
+            </span>
+          </div>
+          <div role="progressbar" aria-valuenow={Math.round(pct)} aria-valuemin="0" aria-valuemax="100"
+            aria-label="Confidence score"
+            style={{ height: 6, background: 'var(--bg-elevated)', borderRadius: 3, overflow: 'hidden' }}>
+            <div className="gauge-anim" style={{ height: '100%', width: `${pct}%`, background: color, borderRadius: 3 }} />
+          </div>
+          <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 4 }}>
+            Mean probability across 100 stochastic forward passes
+          </div>
+        </div>
+      );
+    }
+
+    /* ─────────────────────────────────────────────────────────────
+       UncertaintyRow
+    ───────────────────────────────────────────────────────────── */
+    function UncertaintyRow({ sigma }) {
+      const { label, color, bg, desc } = sigmaLevel(sigma);
+      return (
+        <div style={{ marginTop: 18, display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12 }}>
+          <div>
+            <span className="label" style={{ display: 'block', marginBottom: 5 }}>Uncertainty</span>
+            <span className="mono" style={{ fontSize: 22, fontWeight: 500, letterSpacing: '-0.03em', color: 'var(--text-primary)' }}>
+              σ = {sigma.toFixed(4)}
+            </span>
+            <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 3 }}>Standard deviation of MC sample distribution</div>
+          </div>
+          <div style={{
+            flexShrink: 0, marginTop: 2, padding: '5px 12px',
+            borderRadius: 20, background: bg, color,
+            fontSize: 12, fontWeight: 700, letterSpacing: '0.02em',
+            border: `1px solid ${color}30`,
+          }} title={desc}>
+            {label}
+          </div>
+        </div>
+      );
+    }
+
+    /* ─────────────────────────────────────────────────────────────
+       DiagnosisHeader
+    ───────────────────────────────────────────────────────────── */
+    function DiagnosisHeader({ prediction, filename, thumb }) {
+      const isTumor = prediction === 'Tumor';
+      const color   = isTumor ? 'var(--danger)' : 'var(--positive)';
+      const bg      = isTumor ? 'var(--danger-dim)' : 'var(--positive-dim)';
+      return (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginBottom: 20 }}>
+          {thumb && (
+            <img src={thumb} alt={`MRI scan: ${filename}`} style={{
+              width: 64, height: 64, objectFit: 'cover',
+              borderRadius: 'var(--radius-md)', border: '1px solid var(--border)', flexShrink: 0,
+            }} />
+          )}
+          <div>
+            <div className="mono" style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 6, wordBreak: 'break-all' }}>
+              {filename}
+            </div>
+            <div style={{
+              display: 'inline-block', fontSize: 26, fontWeight: 800,
+              letterSpacing: '-0.03em', color,
+              background: bg, padding: '4px 14px',
+              borderRadius: 'var(--radius-sm)', border: `1px solid ${color}30`,
+            }}>
+              {prediction}
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    /* ─────────────────────────────────────────────────────────────
+       Histogram
+    ───────────────────────────────────────────────────────────── */
+    function Histogram({ b64 }) {
+      const [open, setOpen] = useState(true);
+      return (
+        <div style={{ marginTop: 20 }}>
+          <button
+            onClick={() => setOpen(o => !o)}
+            aria-expanded={open}
+            style={{
+              display: 'flex', alignItems: 'center', gap: 6,
+              background: 'none', border: 'none', cursor: 'pointer',
+              color: 'var(--text-secondary)', padding: '4px 0', marginBottom: 8,
+            }}
+          >
+            <ChevronIcon open={open} />
+            <span className="label">MC sample distribution (100 passes)</span>
+          </button>
+          {open && (
+            <div style={{
+              borderRadius: 'var(--radius-md)', overflow: 'hidden',
+              border: '1px solid var(--border)', background: '#fff',
+              padding: 4,
+            }}>
+              <img
+                src={`data:image/png;base64,${b64}`}
+                alt="MC Dropout sample distribution histogram"
+                style={{ width: '100%', display: 'block', borderRadius: 6 }}
+              />
+            </div>
+          )}
+        </div>
+      );
+    }
+
+    /* ─────────────────────────────────────────────────────────────
+       SkeletonLoader
+    ───────────────────────────────────────────────────────────── */
+    function SkeletonLoader() {
+      return (
+        <div aria-busy="true" aria-label="Loading results" style={{ display: 'flex', flexDirection: 'column', gap: 12, paddingTop: 4 }}>
+          <div className="shimmer-block" style={{ height: 72 }} />
+          <div className="shimmer-block" style={{ height: 52 }} />
+          <div className="shimmer-block" style={{ height: 38 }} />
+          <div className="shimmer-block" style={{ height: 180 }} />
+        </div>
+      );
+    }
+
+    /* ─────────────────────────────────────────────────────────────
+       EmptyState
+    ───────────────────────────────────────────────────────────── */
+    function EmptyState() {
+      return (
+        <div role="status" style={{
+          minHeight: 260, display: 'flex', flexDirection: 'column',
+          alignItems: 'center', justifyContent: 'center', gap: 10,
+        }}>
+          <div style={{ color: 'var(--border)' }}><ScanIcon /></div>
+          <p style={{ fontSize: 13, color: 'var(--text-secondary)', textAlign: 'center', lineHeight: 1.5 }}>
+            No analysis yet
+          </p>
+          <p style={{ fontSize: 12, color: 'var(--text-muted)', maxWidth: 240, textAlign: 'center', lineHeight: 1.6 }}>
+            Select MRI images and click Analyse to run Monte Carlo Dropout inference
+          </p>
+        </div>
+      );
+    }
+
+    /* ─────────────────────────────────────────────────────────────
+       ErrorBanner
+    ───────────────────────────────────────────────────────────── */
+    function ErrorBanner({ msg }) {
+      if (!msg) return null;
+      return (
+        <div role="alert" style={{
+          marginTop: 10, padding: '10px 14px',
+          borderRadius: 'var(--radius-sm)',
+          background: 'var(--danger-dim)', border: '1px solid rgba(248,113,113,0.22)',
+          color: 'var(--danger)', fontSize: 13,
+        }}>
+          {msg}
+        </div>
+      );
+    }
+
+    /* ─────────────────────────────────────────────────────────────
+       ResultCard
+    ───────────────────────────────────────────────────────────── */
+    function ResultCard({ item, thumb, index }) {
+      if (item.error) {
+        return (
+          <div className="fade-up" style={{
+            paddingTop: index > 0 ? 20 : 0,
+            marginTop: index > 0 ? 20 : 0,
+            borderTop: index > 0 ? '1px solid var(--border)' : 'none',
+          }}>
+            <div className="mono" style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 4 }}>{item.filename}</div>
+            <div style={{ fontSize: 13, color: 'var(--danger)' }}>{item.error}</div>
+          </div>
+        );
+      }
+      return (
+        <div className="fade-up" style={{
+          paddingTop: index > 0 ? 22 : 0,
+          marginTop: index > 0 ? 22 : 0,
+          borderTop: index > 0 ? '1px solid var(--border)' : 'none',
+          animationDelay: `${index * 0.06}s`,
+        }}>
+          <DiagnosisHeader prediction={item.prediction} filename={item.filename} thumb={thumb} />
+          <ConfidenceGauge value={item.mean_probability} />
+          <UncertaintyRow sigma={item.uncertainty} />
+          {item.histogram_b64 && <Histogram b64={item.histogram_b64} />}
+        </div>
+      );
+    }
+
+    /* ─────────────────────────────────────────────────────────────
+       HistoryItem
+    ───────────────────────────────────────────────────────────── */
+    function HistoryItem({ item, last }) {
+      const isTumor = item.prediction === 'Tumor';
+      return (
+        <div style={{
+          display: 'flex', alignItems: 'center', gap: 12,
+          padding: '9px 0',
+          borderBottom: last ? 'none' : '1px solid var(--border-subtle)',
+        }}>
+          {item.thumbnailSrc
+            ? <img src={item.thumbnailSrc} alt="" style={{ width: 34, height: 34, objectFit: 'cover', borderRadius: 6, border: '1px solid var(--border)', flexShrink: 0 }} />
+            : <div style={{ width: 34, height: 34, borderRadius: 6, background: 'var(--bg-elevated)', flexShrink: 0 }} />
+          }
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontSize: 12, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: 'var(--text-primary)', marginBottom: 2 }}>
+              {item.filename}
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 4, color: 'var(--text-muted)', fontSize: 11 }}>
+              <ClockIcon />
+              {fmtT(item.timestamp)}
+            </div>
+          </div>
+          <div style={{ textAlign: 'right', flexShrink: 0 }}>
+            <div style={{ fontSize: 11, fontWeight: 700, color: isTumor ? 'var(--danger)' : 'var(--positive)', marginBottom: 2 }}>
+              {item.prediction}
+            </div>
+            <div className="mono" style={{ fontSize: 11, color: 'var(--text-muted)' }}>
+              {fmt(item.mean_probability)}%
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    /* ─────────────────────────────────────────────────────────────
+       App (root)
+    ───────────────────────────────────────────────────────────── */
+    function App() {
+      const [modelInfo,   setModelInfo]   = useState(null);
+      const [files,       setFiles]       = useState([]);
+      const [thumbs,      setThumbs]      = useState([]);
+      const [loading,     setLoading]     = useState(false);
+      const [results,     setResults]     = useState([]);
+      const [resThumbs,   setResThumbs]   = useState([]);
+      const [error,       setError]       = useState('');
+      const [history,     setHistory]     = useState(() => cookieGet('ns_history_v1') || []);
+      const resultsRef = useRef();
+
+      /* Fetch model info once on mount */
+      useEffect(() => {
+        fetch('/model/info')
+          .then(r => r.ok ? r.json() : null)
+          .then(d => d && setModelInfo(d))
+          .catch(() => {});
+      }, []);
+
+      /* File selection */
+      const onFiles = useCallback((incoming) => {
+        thumbs.forEach(URL.revokeObjectURL);
+        setFiles(incoming);
+        setThumbs(incoming.map(f => URL.createObjectURL(f)));
+        setResults([]);
+        setResThumbs([]);
+        setError('');
+      }, [thumbs]);
+
+      const removeFile = useCallback((i) => {
+        URL.revokeObjectURL(thumbs[i]);
+        setFiles(fs => fs.filter((_, idx) => idx !== i));
+        setThumbs(ts => ts.filter((_, idx) => idx !== i));
+      }, [thumbs]);
+
+      /* Analysis */
+      const analyse = async () => {
+        if (!files.length) return;
+        setLoading(true);
+        setError('');
+        setResults([]);
+        const snap = [...thumbs];
+
+        try {
+          let items;
+          if (files.length === 1) {
+            const body = new FormData();
+            body.append('file', files[0]);
+            const r = await fetch('/predict', { method: 'POST', body });
+            const d = await r.json();
+            if (!r.ok) throw new Error(d.detail || 'Prediction failed');
+            items = [{ filename: files[0].name, ...d }];
+          } else {
+            const body = new FormData();
+            files.forEach(f => body.append('files', f));
+            const r = await fetch('/predict/batch', { method: 'POST', body });
+            const d = await r.json();
+            if (!r.ok) throw new Error(d.detail || 'Batch prediction failed');
+            items = d;
+          }
+
+          setResults(items);
+          setResThumbs(snap);
+
+          const now = new Date().toISOString();
+          const next = [
+            ...items.map((it, i) => ({ ...it, timestamp: now, thumbnailSrc: snap[i] || null })),
+            ...history,
+          ].slice(0, 50);
+          setHistory(next);
+          cookieSet('ns_history_v1', next.map(({ filename, prediction, mean_probability, uncertainty, timestamp }) =>
+            ({ filename, prediction, mean_probability, uncertainty, timestamp, thumbnailSrc: null })
+          ));
+
+          setTimeout(() => resultsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 60);
+        } catch (e) {
+          setError(e.message || 'Network error — is the server running?');
+        } finally {
+          setLoading(false);
         }
+      };
 
-        function saveHistoryCookie() {
-            // Only persist lightweight fields — no thumbnailSrc / histogram_b64
-            const slim = sessionHistory.slice(0, COOKIE_MAX_ITEMS).map(
-                ({ filename, prediction, mean_probability, uncertainty, error, timestamp }) =>
-                    ({ filename, prediction, mean_probability, uncertainty, error, timestamp })
-            );
-            const value = encodeURIComponent(JSON.stringify(slim));
-            // 1-year expiry, SameSite=Lax
-            document.cookie = `${COOKIE_NAME}=${value}; max-age=31536000; path=/; SameSite=Lax`;
-        }
+      const clearHistory = () => {
+        setHistory([]);
+        cookieDel('ns_history_v1');
+      };
 
-        function clearHistoryCookie() {
-            document.cookie = `${COOKIE_NAME}=; max-age=0; path=/; SameSite=Lax`;
-        }
+      return (
+        <div style={{ minHeight: '100vh', background: 'var(--bg-base)' }}>
+          <Header modelInfo={modelInfo} />
 
-        // ── Bootstrap history from cookie ─────────────────────────────────
-        // Items restored from cookie have no thumbnailSrc / histogram_b64
-        const sessionHistory = readHistoryCookie();
-        updateHistory();   // show persisted history immediately on load
+          <main style={{ maxWidth: 1240, margin: '0 auto', padding: '28px 24px 60px' }} className="page-wrap">
 
-        // ── Model info badge ─────────────────────────────────────────────
-        (async () => {
-            try {
-                const res = await fetch('/model/info');
-                if (!res.ok) return;
-                const d = await res.json();
-                const dt = new Date(d.loaded_at).toLocaleTimeString();
-                modelBadge.innerHTML =
-                    `Model: <span>${escHtml(d.name)}</span> &nbsp;·&nbsp; ${d.size_mb} MB &nbsp;·&nbsp; loaded ${dt}`;
-                modelBadge.style.display = 'inline-block';
-            } catch (_) {}
-        })();
+            {/* Page heading */}
+            <div style={{ marginBottom: 28 }}>
+              <h1 style={{ fontSize: 22, fontWeight: 700, letterSpacing: '-0.03em', marginBottom: 6 }}>
+                Brain Tumor Detection
+              </h1>
+              <p style={{ fontSize: 13, color: 'var(--text-secondary)', lineHeight: 1.65, maxWidth: '58ch' }}>
+                Probabilistic analysis via Monte Carlo Dropout. Each image is evaluated through 100 stochastic forward passes to produce a confidence score and quantified uncertainty.
+              </p>
+            </div>
 
-        // ── File selection ────────────────────────────────────────────────
-        function setFiles(files) {
-            fileThumbnails.forEach(u => URL.revokeObjectURL(u));
-            selectedFiles  = Array.from(files);
-            fileThumbnails = selectedFiles.map(f => URL.createObjectURL(f));
+            {/* Two-column grid */}
+            <div className="layout-grid">
 
-            fileNameEl.textContent = selectedFiles.length === 1
-                ? selectedFiles[0].name
-                : `${selectedFiles.length} images selected`;
+              {/* ── Left: Upload ───────────────────────────────────── */}
+              <div className="upload-sticky" style={{
+                position: 'sticky', top: 64,
+                background: 'var(--bg-surface)',
+                border: '1px solid var(--border)',
+                borderRadius: 'var(--radius-xl)',
+                padding: 18,
+              }}>
+                <div className="label" style={{ marginBottom: 12 }}>Upload</div>
+                <DropZone onFiles={onFiles} disabled={loading} />
+                <FileList files={files} onRemove={removeFile} />
+                <ErrorBanner msg={error} />
+                <SubmitButton loading={loading} count={files.length} onClick={analyse} />
+                <InfoPanel />
+              </div>
 
-            submitBtn.disabled = false;
-            resultsContainer.innerHTML = '';
-            errorBox.style.display = 'none';
-        }
+              {/* ── Right: Results + History ──────────────────────── */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
 
-        dropZone.addEventListener('click', () => fileInput.click());
-        dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('dragover'); });
-        dropZone.addEventListener('dragleave', () => dropZone.classList.remove('dragover'));
-        dropZone.addEventListener('drop', e => {
-            e.preventDefault();
-            dropZone.classList.remove('dragover');
-            if (e.dataTransfer.files.length) setFiles(e.dataTransfer.files);
-        });
-        fileInput.addEventListener('change', () => { if (fileInput.files.length) setFiles(fileInput.files); });
+                {/* Results panel */}
+                <section
+                  ref={resultsRef}
+                  aria-label="Analysis results"
+                  style={{
+                    background: 'var(--bg-surface)',
+                    border: '1px solid var(--border)',
+                    borderRadius: 'var(--radius-xl)',
+                    padding: '20px 22px',
+                    minHeight: 320,
+                  }}
+                >
+                  <div className="label" style={{ marginBottom: 16 }}>Results</div>
+                  {loading && <SkeletonLoader />}
+                  {!loading && !results.length && <EmptyState />}
+                  {!loading && results.map((item, i) => (
+                    <ResultCard key={i} item={item} thumb={resThumbs[i]} index={i} />
+                  ))}
+                </section>
 
-        // ── Submit ────────────────────────────────────────────────────────
-        document.getElementById('upload-form').addEventListener('submit', async e => {
-            e.preventDefault();
-            if (!selectedFiles.length) return;
-
-            submitBtn.disabled = true;
-            spinner.style.display = 'block';
-            errorBox.style.display = 'none';
-            resultsContainer.innerHTML = '';
-
-            let results;
-            try {
-                const body = new FormData();
-                if (selectedFiles.length === 1) {
-                    body.append('file', selectedFiles[0]);
-                    const res  = await fetch('/predict', { method: 'POST', body });
-                    const data = await res.json();
-                    if (!res.ok) { showError(data.detail || 'Prediction failed.'); return; }
-                    results = [{ filename: selectedFiles[0].name, ...data }];
-                } else {
-                    selectedFiles.forEach(f => body.append('files', f));
-                    const res  = await fetch('/predict/batch', { method: 'POST', body });
-                    const data = await res.json();
-                    if (!res.ok) { showError(data.detail || 'Batch prediction failed.'); return; }
-                    results = data;
-                }
-            } catch (_) {
-                showError('Network error — is the server running?');
-                return;
-            } finally {
-                spinner.style.display = 'none';
-                submitBtn.disabled = false;
-            }
-
-            const now = new Date().toISOString();
-            results.forEach((item, i) => {
-                const thumb = fileThumbnails[i] || '';
-                renderFullCard(item, thumb, resultsContainer);
-                sessionHistory.unshift({ ...item, thumbnailSrc: thumb, timestamp: now });
-            });
-
-            saveHistoryCookie();
-            updateHistory();
-            resultsContainer.firstElementChild?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-        });
-
-        // ── Render: full result card ──────────────────────────────────────
-        function renderFullCard(item, thumbSrc, container) {
-            const div = document.createElement('div');
-            div.className = 'result-card';
-
-            if (item.error) {
-                div.innerHTML = `
-                    <div class="result-filename">${escHtml(item.filename)}</div>
-                    <div class="result-error">${escHtml(item.error)}</div>`;
-                container.appendChild(div);
-                return;
-            }
-
-            const isTumor  = item.prediction === 'Tumor';
-            const cls      = isTumor ? 'tumor' : 'no-tumor';
-            const pct      = (item.mean_probability * 100).toFixed(1);
-
-            div.innerHTML = `
-                <div class="result-header">
-                    ${thumbSrc ? `<img class="result-thumb" src="${escHtml(thumbSrc)}" alt="">` : ''}
-                    <div>
-                        <div class="result-filename">${escHtml(item.filename)}</div>
-                        <div class="diagnosis ${cls}">${escHtml(item.prediction)}</div>
+                {/* History panel */}
+                {history.length > 0 && (
+                  <section
+                    aria-label="Session history"
+                    style={{
+                      background: 'var(--bg-surface)',
+                      border: '1px solid var(--border)',
+                      borderRadius: 'var(--radius-xl)',
+                      padding: '20px 22px',
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
+                      <div className="label">
+                        Session history
+                        <span className="mono" style={{ fontWeight: 400, marginLeft: 6, color: 'var(--text-muted)', textTransform: 'none', letterSpacing: 0 }}>
+                          ({history.length})
+                        </span>
+                      </div>
+                      <button
+                        onClick={clearHistory}
+                        aria-label="Clear session history"
+                        style={{
+                          display: 'flex', alignItems: 'center', gap: 5,
+                          background: 'none', border: '1px solid var(--border)',
+                          borderRadius: 'var(--radius-sm)', cursor: 'pointer',
+                          color: 'var(--text-secondary)', fontSize: 11, padding: '4px 10px',
+                          transition: 'all 0.15s',
+                        }}
+                        onMouseOver={e => { e.currentTarget.style.borderColor = 'var(--danger)'; e.currentTarget.style.color = 'var(--danger)'; }}
+                        onMouseOut={e => { e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.color = 'var(--text-secondary)'; }}
+                      >
+                        <TrashIcon />
+                        Clear
+                      </button>
                     </div>
-                </div>
-                <div class="metric">
-                    <div class="metric-label">Confidence &mdash; Mean Probability</div>
-                    <div class="gauge-track">
-                        <div class="gauge-fill" style="width:${pct}%"></div>
+
+                    <div role="list">
+                      {history.map((item, i) => (
+                        <div key={i} role="listitem">
+                          <HistoryItem item={item} last={i === history.length - 1} />
+                        </div>
+                      ))}
                     </div>
-                    <div class="metric-value">${pct}% &nbsp;(${item.mean_probability.toFixed(4)})</div>
-                </div>
-                <div class="metric">
-                    <div class="metric-label">Uncertainty &mdash; Standard Deviation (&sigma;)</div>
-                    <div class="metric-value">&sigma; = ${item.uncertainty.toFixed(4)}</div>
-                </div>
-                ${item.histogram_b64 ? `
-                <div class="histogram">
-                    <div class="metric-label">MC Sample Distribution (100 forward passes)</div>
-                    <img src="data:image/png;base64,${item.histogram_b64}" alt="Distribution">
-                </div>` : ''}`;
+                  </section>
+                )}
 
-            container.appendChild(div);
-        }
+              </div>
+            </div>
+          </main>
+        </div>
+      );
+    }
 
-        // ── Render: compact history card ──────────────────────────────────
-        function renderHistoryCard(item) {
-            const div = document.createElement('div');
-            div.className = 'history-card';
-
-            const thumb = item.thumbnailSrc
-                ? `<img src="${escHtml(item.thumbnailSrc)}" alt="">`
-                : '🧠';
-
-            if (item.error) {
-                div.innerHTML = `
-                    <div class="history-thumb">${thumb}</div>
-                    <div class="history-details">
-                        <div class="history-filename" title="${escHtml(item.filename)}">${escHtml(item.filename)}</div>
-                        <div class="history-error">${escHtml(item.error)}</div>
-                        <div class="history-ts">${new Date(item.timestamp).toLocaleTimeString()}</div>
-                    </div>`;
-                return div;
-            }
-
-            const cls = item.prediction === 'Tumor' ? 'tumor' : 'no-tumor';
-            const pct = (item.mean_probability * 100).toFixed(1);
-
-            div.innerHTML = `
-                <div class="history-thumb">${thumb}</div>
-                <div class="history-details">
-                    <div class="history-filename" title="${escHtml(item.filename)}">${escHtml(item.filename)}</div>
-                    <span class="diagnosis-badge ${cls}">${escHtml(item.prediction)}</span>
-                    <div class="history-stats">
-                        <span>Confidence: ${pct}%</span>
-                        <span>&sigma; = ${item.uncertainty.toFixed(4)}</span>
-                    </div>
-                    <div class="history-ts">${new Date(item.timestamp).toLocaleTimeString()}</div>
-                    ${item.histogram_b64
-                        ? `<button class="toggle-hist">Show histogram</button>
-                           <div class="hist-expandable" style="display:none">
-                               <img src="data:image/png;base64,${item.histogram_b64}" alt="Distribution">
-                           </div>`
-                        : ''}
-                </div>`;
-
-            div.querySelector('.toggle-hist')?.addEventListener('click', function () {
-                const expandable = div.querySelector('.hist-expandable');
-                const open = expandable.style.display !== 'none';
-                expandable.style.display = open ? 'none' : 'block';
-                this.textContent = open ? 'Show histogram' : 'Hide histogram';
-            });
-
-            return div;
-        }
-
-        // ── History panel ─────────────────────────────────────────────────
-        function updateHistory() {
-            if (!sessionHistory.length) {
-                historyPanel.style.display = 'none';
-                return;
-            }
-            historyPanel.style.display = 'block';
-            historyGrid.innerHTML = '';
-            sessionHistory.forEach(item => historyGrid.appendChild(renderHistoryCard(item)));
-        }
-
-        document.getElementById('clear-history').addEventListener('click', () => {
-            sessionHistory.length = 0;
-            clearHistoryCookie();
-            updateHistory();
-        });
-
-        // ── Helpers ───────────────────────────────────────────────────────
-        function showError(msg) {
-            errorBox.textContent = msg;
-            errorBox.style.display = 'block';
-        }
-
-        function escHtml(s) {
-            return String(s)
-                .replace(/&/g, '&amp;').replace(/</g, '&lt;')
-                .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
-        }
-    </script>
+    /* ── Bootstrap ─────────────────────────────────────────────── */
+    ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+    {% endraw %}
+  </script>
 </body>
 </html>
