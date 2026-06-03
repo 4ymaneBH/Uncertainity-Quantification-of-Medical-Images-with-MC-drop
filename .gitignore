@@ -18,3 +18,24 @@ brain_tumor_dataset/
 .DS_Store
 .idea/
 .vscode/
+.claude/
+
+# LaTeX build artifacts
+*.aux
+*.toc
+*.listing
+*.synctex.gz
+*.fls
+*.fdb_latexmk
+rapport_academique.out
+rapport_academique.log
+
+# Report PDFs and LaTeX source (keep out of repo)
+*.tex
+rapport_*.pdf
+
+# Temp / server logs
+*.log
+
+# Root-level model duplicate (canonical copy lives in models/)
+/monte_carlo_trained_model.pth
