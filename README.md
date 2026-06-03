@@ -1,56 +1,165 @@
 # Uncertainty Quantification of Medical Images with MC Dropout
 
-Brain tumor detection using **Monte Carlo Dropout** for Bayesian uncertainty quantification. A CNN trained on brain MRI images provides not just a prediction, but also a confidence score and uncertainty estimate derived from multiple stochastic forward passes.
+Brain tumor detection using **Monte Carlo Dropout** for Bayesian uncertainty quantification.
+A CNN trained on brain MRI images provides not just a prediction, but also a **confidence score** and
+**uncertainty estimate** derived from 100 stochastic forward passes through the network.
 
-## Features
+## What this project does
 
-- **MC Dropout Inference** — 100 stochastic forward passes → mean probability + std deviation
-- **FastAPI web server** — REST API + browser upload UI at `http://localhost:8000`
-- **Training CLI** — retrain the model from scratch with `mc-train`
-- **Uncertainty histogram** — server-generated distribution plot returned as base64 PNG
-- **Config-driven** — all settings in `config.yaml`, overridable via CLI flags
+Standard deep-learning models output a single prediction with no sense of how confident they are.
+This project applies **MC Dropout** to turn a CNN into a Bayesian approximation:
 
-## Quick Start
+1. Dropout layers are kept **active at inference time** (not just training).
+2. The same image is passed through the network **100 times** with different random dropout masks.
+3. The 100 outputs form a distribution — **mean = confidence**, **std deviation = uncertainty**.
+4. A high uncertainty warns that the model is unsure → flag for clinical review.
 
-### 1. Install
+## Project structure
+
+```
+mc-dropout-uq/
+├── src/mc_dropout/
+│   ├── config.py         # Config dataclass + load_config()
+│   ├── model.py          # CNNModel with MC Dropout
+│   ├── dataset.py        # BrainTumorDataset + get_dataloaders()
+│   ├── train.py          # Training loop  →  mc-train CLI entry point
+│   ├── predict.py        # mc_predict() + uncertainty histogram generator
+│   └── api/
+│       ├── main.py       # FastAPI app + model lifespan loader
+│       ├── routes.py     # GET / and POST /predict (+ /predict/batch)
+│       └── templates/
+│           └── index.html   # Browser upload UI
+├── models/
+│   └── monte_carlo_trained_model.pth   # Pre-trained weights (ready to use)
+├── data/
+│   └── Brain_Tumor_Detection/
+│       ├── yes/   # 1500 MRI images  — tumor
+│       └── no/    # 1500 MRI images  — no tumor
+├── tests/                # pytest test suite
+├── config.yaml           # All runtime settings
+└── pyproject.toml
+```
+
+---
+
+## How to run the project (step by step)
+
+### Prerequisites
+
+- Python 3.9 or newer
+- pip
+
+### Step 1 — Install dependencies
+
+Open a terminal in the project folder and run:
 
 ```bash
 pip install -e ".[dev]"
 ```
 
-### 2. Get the dataset
+This installs the package and all dependencies (PyTorch, FastAPI, Pillow, matplotlib, etc.)
+and registers the `mc-train` and `mc-serve` CLI commands.
 
-Download the Brain Tumor Detection MRI dataset:
-- Kaggle: `kaggle datasets download -d abhranta/brain-tumor-detection-mri`
-- Google Drive: see `DataSet_Google_link.txt`
+### Step 2 — Download the dataset
 
-Extract to `data/Brain_Tumor_Detection/` so it contains `yes/` and `no/` subfolders.
+The dataset is the [Brain Tumor Detection MRI](https://www.kaggle.com/datasets/abhranta/brain-tumor-detection-mri)
+dataset from Kaggle (3000 MRI images, ~64 MB).
 
-### 3. Train (or use pre-trained weights)
+#### Option A — Kaggle CLI (recommended)
 
 ```bash
-# Train from scratch
-mc-train
+# Install the Kaggle CLI if you don't have it
+pip install kaggle
 
-# Or with overrides
-mc-train --epochs 10 --lr 0.0005 --data-dir ./data/Brain_Tumor_Detection
-
-# Pre-trained weights are already at models/monte_carlo_trained_model.pth
+# Download and extract into data/
+cd data
+python -m kaggle datasets download -d abhranta/brain-tumor-detection-mri
 ```
 
-### 4. Run the server
+Then extract the zip:
+
+```bash
+# Windows PowerShell
+Expand-Archive brain-tumor-detection-mri.zip -DestinationPath .
+
+# Linux / macOS
+unzip brain-tumor-detection-mri.zip
+```
+
+#### Option B — Google Drive
+
+Download the zip from the link in `DataSet_Google_link.txt` and extract it so the folder
+structure looks like:
+
+```
+data/
+└── Brain_Tumor_Detection/
+    ├── yes/   ← tumor images
+    └── no/    ← healthy images
+```
+
+### Step 3 — Start the server
+
+A pre-trained model is already included at `models/monte_carlo_trained_model.pth`.
+You do **not** need to train from scratch — just start the server:
+
+```bash
+python -m mc_dropout.api.main
+```
+
+If `mc-serve` is on your PATH (open a fresh terminal after install), you can also use:
 
 ```bash
 mc-serve
 ```
 
-Open `http://localhost:8000` in your browser, upload a brain MRI image, and get a prediction with uncertainty.
+You will see:
 
-## API
+```
+Model loaded from models\monte_carlo_trained_model.pth on cpu
+INFO:     Uvicorn running on http://0.0.0.0:8000
+```
+
+### Step 4 — Open the web UI
+
+Open your browser and go to:
+
+```
+http://localhost:8000
+```
+
+Upload any brain MRI image (JPG or PNG). The system will return:
+
+- **Prediction** — Tumor / No Tumor
+- **Confidence** — mean probability across 100 forward passes
+- **Uncertainty (σ)** — standard deviation; higher = model is less sure
+- **Histogram** — distribution of all 100 predictions visualised as a bar chart
+
+---
+
+## Optional: retrain the model from scratch
+
+If you want to train a new model using the downloaded dataset:
+
+```bash
+mc-train
+```
+
+With custom settings:
+
+```bash
+mc-train --epochs 10 --lr 0.0005 --data-dir ./data/Brain_Tumor_Detection
+```
+
+Training curves (loss + accuracy) are saved to `models/training_curves.png`.
+
+---
+
+## REST API
 
 ### `POST /predict`
 
-Upload a JPEG or PNG image:
+Upload a single image:
 
 ```bash
 curl -X POST http://localhost:8000/predict \
@@ -58,44 +167,33 @@ curl -X POST http://localhost:8000/predict \
 ```
 
 Response:
+
 ```json
 {
   "prediction": "Tumor",
-  "mean_probability": 0.8732,
-  "uncertainty": 0.0412,
+  "mean_probability": 0.9964,
+  "uncertainty": 0.0093,
   "histogram_b64": "<base64 PNG>"
 }
 ```
 
+### `POST /predict/batch`
+
+Upload multiple images in one request — returns a list of results, one per image.
+
+### `GET /model/info`
+
+Returns the loaded model name, file size, and load timestamp.
+
 ### `GET /docs`
 
-Swagger UI — interactive API documentation.
+Swagger UI — interactive API documentation auto-generated by FastAPI.
 
-## Project Structure
-
-```
-mc-dropout-uq/
-├── src/mc_dropout/
-│   ├── config.py       # Config dataclass + load_config()
-│   ├── model.py        # CNNModel with MC Dropout
-│   ├── dataset.py      # BrainTumorDataset + get_dataloaders()
-│   ├── train.py        # Training loop + mc-train CLI
-│   ├── predict.py      # mc_predict() + uncertainty histogram
-│   └── api/
-│       ├── main.py     # FastAPI app factory + lifespan
-│       ├── routes.py   # GET / and POST /predict
-│       └── templates/
-│           └── index.html
-├── models/             # Saved .pth checkpoints
-├── data/               # Dataset (gitignored)
-├── tests/              # pytest test suite
-├── config.yaml         # Runtime configuration
-└── pyproject.toml
-```
+---
 
 ## Configuration
 
-Edit `config.yaml` to change defaults:
+All settings live in `config.yaml`:
 
 ```yaml
 dataset:
@@ -112,16 +210,35 @@ training:
   learning_rate: 0.001
 
 inference:
-  num_mc_samples: 100
+  num_mc_samples: 100   # number of stochastic forward passes
   threshold: 0.5
+
+api:
+  host: 0.0.0.0
+  port: 8000
 ```
 
-## How Monte Carlo Dropout Works
+---
 
-Standard dropout is disabled at inference time. MC Dropout keeps it active by calling `model.train()` before each forward pass. Running N passes through the same image with different random dropout masks produces a distribution of predictions — the **mean** is the final prediction and the **standard deviation** is the uncertainty.
+## How Monte Carlo Dropout works
 
-High uncertainty (large sigma) means the model is unsure — a flag for clinical review.
+| Step | What happens |
+| ---- | ------------ |
+| Training | Dropout randomly zeros neurons to prevent overfitting (standard use) |
+| MC Inference | `model.train()` is called so dropout stays **active** during prediction |
+| 100 passes | Same image → 100 different dropout masks → 100 different outputs |
+| Aggregation | **Mean** of outputs = final probability; **Std dev** = uncertainty |
+| Decision | `probability > 0.5` → Tumor; large σ → flag for human review |
 
-## Tech Stack
+High uncertainty (large σ) means the model's predictions vary widely across passes,
+indicating the image is ambiguous or unlike anything seen in training.
+
+---
+
+## Tech stack
 
 Python · PyTorch · FastAPI · Uvicorn · Jinja2 · Pillow · matplotlib · scikit-learn · PyYAML
+
+## Authors
+
+Aymane Bouhou — [aymanebcontact1@gmail.com](mailto:aymanebcontact1@gmail.com)

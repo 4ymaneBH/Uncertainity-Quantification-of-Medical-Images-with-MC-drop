@@ -1,0 +1,8 @@
+Required DataSet for BrainTumour Detection 
+
+The required dataset google link has been provided
+https://drive.google.com/file/d/1xhd6oxeSC7hyov9joIwmLeHMyDbUoC2C/view?usp=drive_link
+
+
+Direct code for downloading the brain tumour dataset i jupyter notebook or google colab
+!kaggle datasets download -d abhranta/brain-tumor-detection-mri
