@@ -91,3 +91,64 @@ def gradcam_mask(
                               cv2.THRESH_BINARY + cv2.THRESH_OTSU)
 
     return binary
+
+
+def mc_area_estimate(mask: np.ndarray, n_samples: int = _MC_AREA_SAMPLES) -> dict:
+    """Estimate the area of the largest contour in mask using Monte Carlo sampling.
+
+    Returns a dict with keys:
+        area_px       – estimated area in pixels (float)
+        mc_samples_used – n_samples (int)
+        hits          – number of points inside the contour (int)
+        points_xy     – all sampled (x, y) pairs, shape (n_samples, 2) (ndarray)
+        hits_mask     – bool array of length n_samples (ndarray)
+        contour_pts   – the largest contour as (N, 1, 2) int32 ndarray, or None
+    """
+    contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+
+    if not contours:
+        empty_pts = np.empty((n_samples, 2), dtype=np.float32)
+        return {
+            "area_px": 0.0,
+            "mc_samples_used": n_samples,
+            "hits": 0,
+            "points_xy": empty_pts,
+            "hits_mask": np.zeros(n_samples, dtype=bool),
+            "contour_pts": None,
+        }
+
+    contour = max(contours, key=cv2.contourArea)
+
+    h, w = mask.shape
+    x, y, cw, ch = cv2.boundingRect(contour)
+    # Apply padding, clamped to image bounds
+    pad = _ZOOM_PADDING
+    x1 = max(0, x - pad)
+    y1 = max(0, y - pad)
+    x2 = min(w, x + cw + pad)
+    y2 = min(h, y + ch + pad)
+    bbox_area = float((x2 - x1) * (y2 - y1))
+
+    # Random points inside the bounding box
+    rng = np.random.default_rng()
+    xs = rng.uniform(x1, x2, n_samples).astype(np.float32)
+    ys = rng.uniform(y1, y2, n_samples).astype(np.float32)
+    points_xy = np.stack([xs, ys], axis=1)
+
+    # Test each point against the contour polygon
+    hits_mask = np.array(
+        [cv2.pointPolygonTest(contour, (float(px), float(py)), False) >= 0
+         for px, py in points_xy],
+        dtype=bool,
+    )
+    hits = int(hits_mask.sum())
+    area_px = (hits / n_samples) * bbox_area if n_samples > 0 else 0.0
+
+    return {
+        "area_px": area_px,
+        "mc_samples_used": n_samples,
+        "hits": hits,
+        "points_xy": points_xy,
+        "hits_mask": hits_mask,
+        "contour_pts": contour,
+    }
