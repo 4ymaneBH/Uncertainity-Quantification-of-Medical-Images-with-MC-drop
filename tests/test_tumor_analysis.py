@@ -64,3 +64,38 @@ def test_mc_area_estimate_samples_used_matches_n():
     mask = _solid_circle_mask()
     result = mc_area_estimate(mask, n_samples=2_000)
     assert result["mc_samples_used"] == 2_000
+
+
+from mc_dropout.tumor_analysis import render_annotated_images
+
+
+def test_render_annotated_images_returns_two_valid_b64_pngs():
+    import base64 as _b64
+    size = 150
+    mask = _solid_circle_mask(size=size)
+    area_data = mc_area_estimate(mask, n_samples=500)
+
+    img = Image.new("RGB", (size, size), color=(80, 80, 80))
+    contour_b64, scatter_b64 = render_annotated_images(
+        original_image=img,
+        contour_pts=area_data["contour_pts"],
+        bbox=(0, 0, size, size),
+        points_xy=area_data["points_xy"],
+        hits_mask=area_data["hits_mask"],
+    )
+    for b64 in (contour_b64, scatter_b64):
+        assert isinstance(b64, str)
+        raw = _b64.b64decode(b64)
+        assert raw[:8] == b"\x89PNG\r\n\x1a\n", "must be a valid PNG"
+
+
+def test_render_annotated_images_none_contour_returns_none_pair():
+    img = Image.new("RGB", (150, 150))
+    result = render_annotated_images(
+        original_image=img,
+        contour_pts=None,
+        bbox=(0, 0, 150, 150),
+        points_xy=np.empty((0, 2), dtype=np.float32),
+        hits_mask=np.array([], dtype=bool),
+    )
+    assert result == (None, None)

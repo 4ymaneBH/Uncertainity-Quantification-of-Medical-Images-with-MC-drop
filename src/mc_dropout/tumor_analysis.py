@@ -164,3 +164,58 @@ def mc_area_estimate(mask: np.ndarray, n_samples: int = _MC_AREA_SAMPLES, rng: n
         "hits_mask": hits_mask,
         "contour_pts": contour,
     }
+
+
+def render_annotated_images(
+    original_image: Image.Image,
+    contour_pts: np.ndarray | None,
+    bbox: Tuple[int, int, int, int],
+    points_xy: np.ndarray,
+    hits_mask: np.ndarray,
+) -> Tuple[str | None, str | None]:
+    """Produce two base64-encoded PNG strings for the result panel.
+
+    contour_b64: zoomed crop with cyan contour stroke.
+    scatter_b64: same crop + green (hit) / red (miss) MC dots overlaid.
+
+    Returns (None, None) if contour_pts is None.
+    """
+    if contour_pts is None:
+        return None, None
+
+    x1, y1, x2, y2 = bbox
+    # Crop from original image (resized to match mask dimensions used in analysis)
+    crop = original_image.crop((x1, y1, x2, y2))
+    crop_cv = cv2.cvtColor(np.array(crop), cv2.COLOR_RGB2BGR)
+
+    # Shift contour coordinates to crop-local space
+    shifted = contour_pts - np.array([[[x1, y1]]], dtype=contour_pts.dtype)
+
+    # ── Contour image ──────────────────────────────────────────
+    contour_img = crop_cv.copy()
+    cv2.drawContours(contour_img, [shifted], -1, (0, 255, 255), _CONTOUR_STROKE)
+    contour_b64 = _encode_bgr(contour_img)
+
+    # ── Scatter image ──────────────────────────────────────────
+    scatter_img = crop_cv.copy()
+    cv2.drawContours(scatter_img, [shifted], -1, (0, 255, 255), _CONTOUR_STROKE)
+
+    # Cap dots rendered to avoid bloating the image
+    cap = min(len(points_xy), _MAX_SCATTER_DOTS)
+    idx = np.random.choice(len(points_xy), cap, replace=False) if len(points_xy) > cap else np.arange(len(points_xy))
+    for i in idx:
+        px, py = int(points_xy[i, 0]) - x1, int(points_xy[i, 1]) - y1
+        color = (0, 200, 0) if hits_mask[i] else (0, 0, 200)  # BGR
+        cv2.circle(scatter_img, (px, py), _DOT_RADIUS, color, -1)
+
+    scatter_b64 = _encode_bgr(scatter_img)
+
+    return contour_b64, scatter_b64
+
+
+def _encode_bgr(img_bgr: np.ndarray) -> str:
+    """Encode a BGR numpy array to a base64 PNG string."""
+    ok, buf = cv2.imencode(".png", img_bgr)
+    if not ok:
+        raise RuntimeError("cv2.imencode failed")
+    return base64.b64encode(buf.tobytes()).decode("utf-8")
