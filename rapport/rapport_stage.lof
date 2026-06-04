@@ -1,0 +1,26 @@
+\babel@toc {french}{}\relax 
+\addvspace {10\p@ }
+\addvspace {10\p@ }
+\contentsline {figure}{\numberline {2.1}{\ignorespaces Visualisation du dropout}}{12}{figure.caption.7}%
+\contentsline {figure}{\numberline {2.2}{\ignorespaces Illustrations de la méthode de Monte-Carlo}}{13}{figure.caption.8}%
+\addvspace {10\p@ }
+\contentsline {figure}{\numberline {3.1}{\ignorespaces Pipeline de prétraitement des images}}{15}{figure.caption.11}%
+\addvspace {10\p@ }
+\contentsline {figure}{\numberline {4.1}{\ignorespaces Architecture en couches du système}}{17}{figure.caption.13}%
+\contentsline {figure}{\numberline {4.2}{\ignorespaces Architecture détaillée du CNNModel}}{17}{figure.caption.14}%
+\addvspace {10\p@ }
+\contentsline {figure}{\numberline {5.1}{\ignorespaces Algorithme d'inférence Monte Carlo Dropout}}{21}{figure.caption.19}%
+\contentsline {figure}{\numberline {5.2}{\ignorespaces Page d'accueil de l'interface NeuroScan}}{22}{figure.caption.20}%
+\contentsline {figure}{\numberline {5.3}{\ignorespaces Sélection d'une image à analyser}}{23}{figure.caption.21}%
+\contentsline {figure}{\numberline {5.4}{\ignorespaces Résultat d'une analyse unitaire}}{24}{figure.caption.22}%
+\contentsline {figure}{\numberline {5.5}{\ignorespaces Analyse par lot de plusieurs IRM}}{25}{figure.caption.23}%
+\contentsline {figure}{\numberline {5.6}{\ignorespaces Historique de session}}{26}{figure.caption.24}%
+\addvspace {10\p@ }
+\contentsline {figure}{\numberline {6.1}{\ignorespaces Courbes d'apprentissage sur 5 époques}}{28}{figure.caption.25}%
+\addvspace {10\p@ }
+\contentsline {figure}{\numberline {7.1}{\ignorespaces Cas tumoral à incertitude modérée}}{29}{figure.caption.29}%
+\contentsline {figure}{\numberline {7.2}{\ignorespaces Cas sain à incertitude modérée}}{30}{figure.caption.31}%
+\addvspace {10\p@ }
+\addvspace {10\p@ }
+\addvspace {10\p@ }
+\addvspace {10\p@ }

@@ -1,0 +1,22 @@
+\babel@toc {french}{}\relax 
+\addvspace {10\p@ }
+\addvspace {10\p@ }
+\contentsline {table}{\numberline {2.1}{\ignorespaces Taxonomie des deux types d'incertitude.}}{14}{table.caption.9}%
+\addvspace {10\p@ }
+\contentsline {table}{\numberline {3.1}{\ignorespaces Composition du jeu de données \emph {Brain Tumor Detection MRI}.}}{15}{table.caption.10}%
+\contentsline {table}{\numberline {3.2}{\ignorespaces Partitionnement des données (\texttt {test\_split}~$=0{,}2$).}}{16}{table.caption.12}%
+\addvspace {10\p@ }
+\contentsline {table}{\numberline {4.1}{\ignorespaces Détail des couches du \texttt {CNNModel} (\textasciitilde {}5,4~M paramètres).}}{18}{table.caption.15}%
+\contentsline {table}{\numberline {4.2}{\ignorespaces Pile technologique du projet.}}{19}{table.caption.16}%
+\contentsline {table}{\numberline {4.3}{\ignorespaces Paramètres du fichier \texttt {config.yaml}.}}{19}{table.caption.17}%
+\addvspace {10\p@ }
+\contentsline {table}{\numberline {5.1}{\ignorespaces Routes exposées par le serveur FastAPI.}}{20}{table.caption.18}%
+\addvspace {10\p@ }
+\contentsline {table}{\numberline {6.1}{\ignorespaces Métriques d'entraînement par époque.}}{28}{table.caption.26}%
+\addvspace {10\p@ }
+\contentsline {table}{\numberline {7.1}{\ignorespaces Règle de décision fondée sur l'incertitude $\hat {\sigma }$.}}{30}{table.caption.32}%
+\addvspace {10\p@ }
+\contentsline {table}{\numberline {8.1}{\ignorespaces Principales difficultés rencontrées et solutions adoptées.}}{32}{table.caption.33}%
+\addvspace {10\p@ }
+\addvspace {10\p@ }
+\addvspace {10\p@ }
