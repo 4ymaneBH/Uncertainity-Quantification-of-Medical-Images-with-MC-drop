@@ -1,10 +1,11 @@
+import io
+import base64
 import numpy as np
 import torch
 import cv2
 from PIL import Image
 from mc_dropout.model import CNNModel
-from mc_dropout.tumor_analysis import gradcam_mask
-from mc_dropout.tumor_analysis import mc_area_estimate
+from mc_dropout.tumor_analysis import gradcam_mask, mc_area_estimate, render_annotated_images
 
 
 def _blank_image(size: int = 150) -> Image.Image:
@@ -66,14 +67,10 @@ def test_mc_area_estimate_samples_used_matches_n():
     assert result["mc_samples_used"] == 2_000
 
 
-from mc_dropout.tumor_analysis import render_annotated_images
-
-
 def test_render_annotated_images_returns_two_valid_b64_pngs():
-    import base64 as _b64
     size = 150
     mask = _solid_circle_mask(size=size)
-    area_data = mc_area_estimate(mask, n_samples=500)
+    area_data = mc_area_estimate(mask, n_samples=500, rng=np.random.default_rng(42))
 
     img = Image.new("RGB", (size, size), color=(80, 80, 80))
     contour_b64, scatter_b64 = render_annotated_images(
@@ -82,11 +79,17 @@ def test_render_annotated_images_returns_two_valid_b64_pngs():
         bbox=(0, 0, size, size),
         points_xy=area_data["points_xy"],
         hits_mask=area_data["hits_mask"],
+        rng=np.random.default_rng(7),
     )
     for b64 in (contour_b64, scatter_b64):
         assert isinstance(b64, str)
-        raw = _b64.b64decode(b64)
+        raw = base64.b64decode(b64)
         assert raw[:8] == b"\x89PNG\r\n\x1a\n", "must be a valid PNG"
+
+    # Verify contour was actually drawn — output must differ from plain gray crop
+    plain = np.array(img.crop((0, 0, size, size)))
+    contour_arr = np.array(Image.open(io.BytesIO(base64.b64decode(contour_b64))))
+    assert not np.array_equal(plain, contour_arr[:, :, :3]), "contour image must differ from plain crop"
 
 
 def test_render_annotated_images_none_contour_returns_none_pair():
