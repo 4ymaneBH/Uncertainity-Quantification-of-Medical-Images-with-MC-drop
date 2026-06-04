@@ -93,7 +93,7 @@ def gradcam_mask(
     return binary
 
 
-def mc_area_estimate(mask: np.ndarray, n_samples: int = _MC_AREA_SAMPLES) -> dict:
+def mc_area_estimate(mask: np.ndarray, n_samples: int = _MC_AREA_SAMPLES, rng: np.random.Generator | None = None) -> dict:
     """Estimate the area of the largest contour in mask using Monte Carlo sampling.
 
     Returns a dict with keys:
@@ -107,7 +107,7 @@ def mc_area_estimate(mask: np.ndarray, n_samples: int = _MC_AREA_SAMPLES) -> dic
     contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
 
     if not contours:
-        empty_pts = np.empty((n_samples, 2), dtype=np.float32)
+        empty_pts = np.zeros((n_samples, 2), dtype=np.float32)
         return {
             "area_px": 0.0,
             "mc_samples_used": n_samples,
@@ -118,6 +118,17 @@ def mc_area_estimate(mask: np.ndarray, n_samples: int = _MC_AREA_SAMPLES) -> dic
         }
 
     contour = max(contours, key=cv2.contourArea)
+
+    # Guard: degenerate contour with no area
+    if cv2.contourArea(contour) == 0:
+        return {
+            "area_px": 0.0,
+            "mc_samples_used": n_samples,
+            "hits": 0,
+            "points_xy": np.zeros((n_samples, 2), dtype=np.float32),
+            "hits_mask": np.zeros(n_samples, dtype=bool),
+            "contour_pts": contour,
+        }
 
     h, w = mask.shape
     x, y, cw, ch = cv2.boundingRect(contour)
@@ -130,7 +141,8 @@ def mc_area_estimate(mask: np.ndarray, n_samples: int = _MC_AREA_SAMPLES) -> dic
     bbox_area = float((x2 - x1) * (y2 - y1))
 
     # Random points inside the bounding box
-    rng = np.random.default_rng()
+    if rng is None:
+        rng = np.random.default_rng()
     xs = rng.uniform(x1, x2, n_samples).astype(np.float32)
     ys = rng.uniform(y1, y2, n_samples).astype(np.float32)
     points_xy = np.stack([xs, ys], axis=1)

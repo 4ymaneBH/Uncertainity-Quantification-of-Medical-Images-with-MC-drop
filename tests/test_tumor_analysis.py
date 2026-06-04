@@ -47,7 +47,7 @@ def test_mc_area_estimate_area_close_to_true_circle():
     import math
     radius = 40
     mask = _solid_circle_mask(radius=radius)
-    result = mc_area_estimate(mask, n_samples=100_000)
+    result = mc_area_estimate(mask, n_samples=100_000, rng=np.random.default_rng(42))
     expected = math.pi * radius ** 2
     # Allow 5% relative error at 100k samples
     assert abs(result["area_px"] - expected) / expected < 0.05
