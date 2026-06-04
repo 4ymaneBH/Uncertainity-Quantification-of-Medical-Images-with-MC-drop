@@ -14,7 +14,7 @@ from mc_dropout.model import CNNModel
 _IMAGENET_MEAN = [0.485, 0.456, 0.406]
 _IMAGENET_STD  = [0.229, 0.224, 0.225]
 
-_GRADCAM_PERCENTILE = 75
+_GRADCAM_PERCENTILE = 85        # tighter attention region → less skull noise
 _MC_AREA_SAMPLES    = 50_000
 _CONTOUR_STROKE     = 2
 _ZOOM_PADDING       = 20
@@ -90,7 +90,46 @@ def gradcam_mask(
     _, binary = cv2.threshold(masked_gray, 0, 255,
                               cv2.THRESH_BINARY + cv2.THRESH_OTSU)
 
-    return binary
+    # Pick the most circular compact blob — tumors are roughly round;
+    # skull rings and cortex boundaries are large and elongated.
+    best_mask = _select_tumor_blob(binary, image_size)
+    return best_mask if best_mask is not None else binary
+
+
+def _select_tumor_blob(binary: np.ndarray, image_size: int) -> np.ndarray | None:
+    """Return a mask containing only the most circular compact blob.
+
+    Filters out blobs that are too small (noise) or too large (skull ring /
+    brain boundary), then scores survivors by circularity.  Returns None if no
+    candidate passes the size filter.
+    """
+    n_labels, labels, stats, _ = cv2.connectedComponentsWithStats(binary)
+
+    min_area = 50                           # ignore specks
+    max_area = int(0.25 * image_size ** 2)  # ignore skull-ring-sized regions
+
+    best_mask: np.ndarray | None = None
+    best_score = -1.0
+
+    for i in range(1, n_labels):            # skip label 0 (background)
+        area = int(stats[i, cv2.CC_STAT_AREA])
+        if area < min_area or area > max_area:
+            continue
+
+        blob = (labels == i).astype(np.uint8) * 255
+        cnts, _ = cv2.findContours(blob, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+        if not cnts:
+            continue
+
+        perimeter = cv2.arcLength(cnts[0], True)
+        # Circularity: 1.0 for a perfect circle, lower for elongated shapes
+        circularity = (4.0 * np.pi * area / (perimeter ** 2)) if perimeter > 0 else 0.0
+
+        if circularity > best_score:
+            best_score = circularity
+            best_mask = blob
+
+    return best_mask
 
 
 def mc_area_estimate(mask: np.ndarray, n_samples: int = _MC_AREA_SAMPLES, rng: np.random.Generator | None = None) -> dict:
@@ -194,7 +233,7 @@ def render_annotated_images(
 
     # ── Contour image ──────────────────────────────────────────
     contour_img = crop_cv.copy()
-    cv2.drawContours(contour_img, [shifted], -1, (0, 255, 255), _CONTOUR_STROKE)
+    cv2.drawContours(contour_img, [shifted], -1, (255, 255, 0), _CONTOUR_STROKE)  # BGR → PNG cyan
     contour_b64 = _encode_bgr(contour_img)
 
     # ── Scatter image ──────────────────────────────────────────
