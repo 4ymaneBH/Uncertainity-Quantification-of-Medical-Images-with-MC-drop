@@ -53,9 +53,9 @@ def gradcam_mask(
 
     try:
         model.eval()
-        out = model(tensor)
         model.zero_grad()
-        out.backward()
+        out = model(tensor)
+        out[0, 0].backward()
     finally:
         fwd_hook.remove()
         bwd_hook.remove()
