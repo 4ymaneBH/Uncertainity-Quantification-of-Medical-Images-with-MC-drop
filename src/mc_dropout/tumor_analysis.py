@@ -14,7 +14,8 @@ from mc_dropout.model import CNNModel
 _IMAGENET_MEAN = [0.485, 0.456, 0.406]
 _IMAGENET_STD  = [0.229, 0.224, 0.225]
 
-_GRADCAM_PERCENTILE = 85        # tighter attention region → less skull noise
+_GRADCAM_PERCENTILE = 85
+_BRIGHT_PERCENTILE  = 85        # top 15% intensity = tumor-range brightness
 _MC_AREA_SAMPLES    = 50_000
 _CONTOUR_STROKE     = 2
 _ZOOM_PADDING       = 20
@@ -74,62 +75,53 @@ def gradcam_mask(
     cam_resized = cv2.resize(cam_np, (image_size, image_size),
                              interpolation=cv2.INTER_LINEAR)
 
-    # Coarse attention mask: top GRADCAM_PERCENTILE activations
-    threshold_val = float(np.percentile(cam_resized, _GRADCAM_PERCENTILE))
-    attention_mask = (cam_resized >= threshold_val).astype(np.uint8) * 255
-
-    if attention_mask.sum() == 0:
-        # Fallback: use full image
-        attention_mask = np.ones((image_size, image_size), dtype=np.uint8) * 255
+    # Peak of GradCAM heatmap — the exact pixel the model focused on most
+    peak_y, peak_x = np.unravel_index(np.argmax(cam_resized), cam_resized.shape)
 
     # Grayscale of the resized original image
     gray = np.array(image.resize((image_size, image_size)).convert("L"))
 
-    # Otsu threshold inside attention region
-    masked_gray = cv2.bitwise_and(gray, gray, mask=attention_mask)
-    _, binary = cv2.threshold(masked_gray, 0, 255,
-                              cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+    # High-intensity threshold: tumors appear as the brightest white region in MRI
+    bright_thresh = float(np.percentile(gray, _BRIGHT_PERCENTILE))
+    _, bright_mask = cv2.threshold(gray, bright_thresh, 255, cv2.THRESH_BINARY)
 
-    # Pick the most circular compact blob — tumors are roughly round;
-    # skull rings and cortex boundaries are large and elongated.
-    best_mask = _select_tumor_blob(binary, image_size)
-    return best_mask if best_mask is not None else binary
+    # Find the bright connected component nearest to the GradCAM peak
+    # (the skull is large and far from the peak; the tumor is compact and on-peak)
+    best_mask = _pick_component_near(bright_mask, peak_x, peak_y)
+
+    if best_mask is not None:
+        return best_mask
+
+    # Fallback: return the full bright mask so downstream always has something
+    return bright_mask
 
 
-def _select_tumor_blob(binary: np.ndarray, image_size: int) -> np.ndarray | None:
-    """Return a mask containing only the most circular compact blob.
+def _pick_component_near(binary: np.ndarray, peak_x: int, peak_y: int) -> np.ndarray | None:
+    """Return the connected component whose centroid is closest to (peak_x, peak_y).
 
-    Filters out blobs that are too small (noise) or too large (skull ring /
-    brain boundary), then scores survivors by circularity.  Returns None if no
-    candidate passes the size filter.
+    Skips components that are too small (noise) or whose centroid is more than
+    half the image width away from the peak (clearly not the tumor).
     """
-    n_labels, labels, stats, _ = cv2.connectedComponentsWithStats(binary)
+    n_labels, labels, stats, centroids = cv2.connectedComponentsWithStats(binary)
+    h, w = binary.shape
+    min_area = 30
+    max_dist = w * 0.6   # ignore blobs far from the model's focus point
 
-    min_area = 50                           # ignore specks
-    max_area = int(0.25 * image_size ** 2)  # ignore skull-ring-sized regions
+    best_label: int | None = None
+    best_dist = float("inf")
 
-    best_mask: np.ndarray | None = None
-    best_score = -1.0
-
-    for i in range(1, n_labels):            # skip label 0 (background)
-        area = int(stats[i, cv2.CC_STAT_AREA])
-        if area < min_area or area > max_area:
+    for i in range(1, n_labels):
+        if int(stats[i, cv2.CC_STAT_AREA]) < min_area:
             continue
+        cx, cy = float(centroids[i][0]), float(centroids[i][1])
+        dist = np.hypot(cx - peak_x, cy - peak_y)
+        if dist < best_dist and dist < max_dist:
+            best_dist = dist
+            best_label = i
 
-        blob = (labels == i).astype(np.uint8) * 255
-        cnts, _ = cv2.findContours(blob, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-        if not cnts:
-            continue
-
-        perimeter = cv2.arcLength(cnts[0], True)
-        # Circularity: 1.0 for a perfect circle, lower for elongated shapes
-        circularity = (4.0 * np.pi * area / (perimeter ** 2)) if perimeter > 0 else 0.0
-
-        if circularity > best_score:
-            best_score = circularity
-            best_mask = blob
-
-    return best_mask
+    if best_label is None:
+        return None
+    return (labels == best_label).astype(np.uint8) * 255
 
 
 def mc_area_estimate(mask: np.ndarray, n_samples: int = _MC_AREA_SAMPLES, rng: np.random.Generator | None = None) -> dict:
@@ -233,7 +225,7 @@ def render_annotated_images(
 
     # ── Contour image ──────────────────────────────────────────
     contour_img = crop_cv.copy()
-    cv2.drawContours(contour_img, [shifted], -1, (255, 255, 0), _CONTOUR_STROKE)  # BGR → PNG cyan
+    cv2.drawContours(contour_img, [shifted], -1, (0, 255, 255), _CONTOUR_STROKE)  # BGR cyan
     contour_b64 = _encode_bgr(contour_img)
 
     # ── Scatter image ──────────────────────────────────────────
@@ -258,8 +250,9 @@ def render_annotated_images(
 
 
 def _encode_bgr(img_bgr: np.ndarray) -> str:
-    """Encode a BGR numpy array to a base64 PNG string."""
-    ok, buf = cv2.imencode(".png", img_bgr)
+    """Encode a BGR numpy array to a base64 PNG string (converts to RGB first)."""
+    img_rgb = cv2.cvtColor(img_bgr, cv2.COLOR_BGR2RGB)
+    ok, buf = cv2.imencode(".png", img_rgb)
     if not ok:
         raise RuntimeError("cv2.imencode failed")
     return base64.b64encode(buf.tobytes()).decode("utf-8")
