@@ -13,7 +13,7 @@ from PIL import Image
 from torchvision import transforms
 
 from mc_dropout.model import CNNModel
-from mc_dropout.tumor_analysis import gradcam_mask, mc_area_estimate, render_annotated_images
+from mc_dropout.tumor_analysis import tumor_mask, mc_area_estimate, render_annotated_images
 
 _IMAGENET_MEAN = [0.485, 0.456, 0.406]
 _IMAGENET_STD = [0.229, 0.224, 0.225]
@@ -73,7 +73,7 @@ def mc_predict(
         was_training = model.training
         try:
             resized = image.resize((image_size, image_size))
-            mask = gradcam_mask(resized, model, device=device, image_size=image_size)
+            mask = tumor_mask(resized, image_size=image_size)
             area_data = mc_area_estimate(mask)
             if area_data["contour_pts"] is not None:
                 h, w = mask.shape

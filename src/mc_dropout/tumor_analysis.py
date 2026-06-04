@@ -1,21 +1,22 @@
 from __future__ import annotations
 import base64
-import io
 from typing import Tuple
 
 import cv2
 import numpy as np
-import torch
 from PIL import Image
-from torchvision import transforms
 
-from mc_dropout.model import CNNModel
+_BRIGHT_PERCENTILE  = 85        # top 15% intensity = tumor-range brightness (seed)
+_MIN_AREA           = 30        # ignore specks
+_MIN_SOLIDITY       = 0.5       # rings/edges are far from convex; tumors are ~convex
+_MIN_EXTENT         = 0.35      # tumors fill much of their bbox; rings barely any
+_MAX_BBOX_FRAC      = 0.6       # a near-full-frame bbox is skull/brain, not a tumor
+_ROI_PAD            = 15        # ROI padding around the seed blob for refinement
+_MAX_GROWTH         = 4.0       # refined-vs-seed area ratio above which growth is
+                                # "excessive" — only rejected if ALSO skull-shaped
+_OPEN_KERNEL        = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3, 3))
+_CLOSE_KERNEL       = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (5, 5))
 
-_IMAGENET_MEAN = [0.485, 0.456, 0.406]
-_IMAGENET_STD  = [0.229, 0.224, 0.225]
-
-_GRADCAM_PERCENTILE = 85
-_BRIGHT_PERCENTILE  = 85        # top 15% intensity = tumor-range brightness
 _MC_AREA_SAMPLES    = 50_000
 _CONTOUR_STROKE     = 2
 _ZOOM_PADDING       = 20
@@ -23,105 +24,133 @@ _DOT_RADIUS         = 1
 _MAX_SCATTER_DOTS   = 5_000
 
 
-def gradcam_mask(
-    image: Image.Image,
-    model: CNNModel,
-    device: torch.device,
-    image_size: int = 150,
-) -> np.ndarray:
+def tumor_mask(image: Image.Image, image_size: int = 150) -> np.ndarray:
     """Return a binary uint8 mask (0/255) of shape (image_size, image_size).
 
-    Uses GradCAM on the last conv layer (conv3) to find the attention region,
-    then refines with Otsu thresholding inside that region.
+    GradCAM-free localiser validated in the segmentation audit:
+
+        1. seed   — largest *shape-valid* bright blob (skull-safe shape filters)
+        2. refine — local Otsu inside the seed ROI, keep only the component(s)
+                    connected to the seed, light morphological close
+        3. guard  — reject the refined mask (fall back to the closed seed) if it
+                    grows excessively *and* takes on a skull-like shape
+
+    The classifier is no longer used for localisation; `model`/`device` were
+    dropped. See `gradcam_mask` for the backward-compatible shim.
     """
-    transform = transforms.Compose([
-        transforms.Resize((image_size, image_size)),
-        transforms.ToTensor(),
-        transforms.Normalize(mean=_IMAGENET_MEAN, std=_IMAGENET_STD),
-    ])
-    tensor = transform(image).unsqueeze(0).to(device)
-
-    # Storage for hooks
-    activations: list[torch.Tensor] = []
-    gradients:   list[torch.Tensor] = []
-
-    fwd_hook = model.conv3.register_forward_hook(
-        lambda _m, _i, out: activations.append(out)
-    )
-    bwd_hook = model.conv3.register_full_backward_hook(
-        lambda _m, _gi, go: gradients.append(go[0])
-    )
-
-    try:
-        model.eval()
-        model.zero_grad()
-        out = model(tensor)
-        out[0, 0].backward()
-    finally:
-        fwd_hook.remove()
-        bwd_hook.remove()
-
-    # GradCAM: weight channels by global-average-pooled gradient
-    act  = activations[0].squeeze(0)          # (C, H, W)
-    grad = gradients[0].squeeze(0)            # (C, H, W)
-    weights = grad.mean(dim=(1, 2), keepdim=True)  # (C, 1, 1)
-    cam = torch.relu((act * weights).sum(dim=0))    # (H, W)
-
-    cam_np = cam.detach().cpu().numpy()
-    if cam_np.max() > 0:
-        cam_np = cam_np / cam_np.max()
-
-    # Upsample to image_size
-    cam_resized = cv2.resize(cam_np, (image_size, image_size),
-                             interpolation=cv2.INTER_LINEAR)
-
-    # Peak of GradCAM heatmap — the exact pixel the model focused on most
-    peak_y, peak_x = np.unravel_index(np.argmax(cam_resized), cam_resized.shape)
-
-    # Grayscale of the resized original image
     gray = np.array(image.resize((image_size, image_size)).convert("L"))
 
-    # High-intensity threshold: tumors appear as the brightest white region in MRI
-    bright_thresh = float(np.percentile(gray, _BRIGHT_PERCENTILE))
-    _, bright_mask = cv2.threshold(gray, bright_thresh, 255, cv2.THRESH_BINARY)
+    seed = _select_seed_blob(gray)
+    if seed is None:
+        return np.zeros((image_size, image_size), dtype=np.uint8)
 
-    # Find the bright connected component nearest to the GradCAM peak
-    # (the skull is large and far from the peak; the tumor is compact and on-peak)
-    best_mask = _pick_component_near(bright_mask, peak_x, peak_y)
-
-    if best_mask is not None:
-        return best_mask
-
-    # Fallback: return the full bright mask so downstream always has something
-    return bright_mask
+    return _refine_roi(gray, seed)
 
 
-def _pick_component_near(binary: np.ndarray, peak_x: int, peak_y: int) -> np.ndarray | None:
-    """Return the connected component whose centroid is closest to (peak_x, peak_y).
+def _select_seed_blob(gray: np.ndarray) -> np.ndarray | None:
+    """Largest connected bright blob that passes the skull-safety shape filters.
 
-    Skips components that are too small (noise) or whose centroid is more than
-    half the image width away from the peak (clearly not the tumor).
+    A tumor is a compact, mostly-filled, sub-frame blob. The skull rim is a thin
+    hollow ring (low solidity / low extent) that spans the whole frame, so it is
+    rejected by shape regardless of how bright it is.
     """
-    n_labels, labels, stats, centroids = cv2.connectedComponentsWithStats(binary)
-    h, w = binary.shape
-    min_area = 30
-    max_dist = w * 0.6   # ignore blobs far from the model's focus point
+    h, w = gray.shape
+    thresh = float(np.percentile(gray, _BRIGHT_PERCENTILE))
+    _, bright = cv2.threshold(gray, thresh, 255, cv2.THRESH_BINARY)
+    bright = cv2.morphologyEx(bright, cv2.MORPH_OPEN, _OPEN_KERNEL)
 
+    n_labels, labels, stats, _ = cv2.connectedComponentsWithStats(bright)
     best_label: int | None = None
-    best_dist = float("inf")
+    best_area = 0
 
     for i in range(1, n_labels):
-        if int(stats[i, cv2.CC_STAT_AREA]) < min_area:
+        area = int(stats[i, cv2.CC_STAT_AREA])
+        if area < _MIN_AREA:
             continue
-        cx, cy = float(centroids[i][0]), float(centroids[i][1])
-        dist = np.hypot(cx - peak_x, cy - peak_y)
-        if dist < best_dist and dist < max_dist:
-            best_dist = dist
-            best_label = i
+        bw = int(stats[i, cv2.CC_STAT_WIDTH])
+        bh = int(stats[i, cv2.CC_STAT_HEIGHT])
+        if bw >= w * _MAX_BBOX_FRAC and bh >= h * _MAX_BBOX_FRAC:
+            continue
+        if area / float(bw * bh) < _MIN_EXTENT:
+            continue
+        if _solidity((labels == i).astype(np.uint8)) < _MIN_SOLIDITY:
+            continue
+        if area > best_area:
+            best_area, best_label = area, i
 
     if best_label is None:
         return None
     return (labels == best_label).astype(np.uint8) * 255
+
+
+def _refine_roi(gray: np.ndarray, seed: np.ndarray) -> np.ndarray:
+    """Recover the full lesion: local Otsu in the seed ROI, connected to the seed.
+
+    The global brightness percentile only keeps the brightest *core* of the
+    lesion; re-thresholding locally (Otsu) inside the seed's padded bounding box
+    recovers the dimmer periphery. The skull cannot leak in because (a) the ROI
+    excludes the rim and (b) we keep only components touching the seed.
+    """
+    h, w = gray.shape
+    x, y, bw, bh = cv2.boundingRect(seed)
+    x1 = max(0, x - _ROI_PAD)
+    y1 = max(0, y - _ROI_PAD)
+    x2 = min(w, x + bw + _ROI_PAD)
+    y2 = min(h, y + bh + _ROI_PAD)
+
+    otsu_t, _ = cv2.threshold(gray[y1:y2, x1:x2], 0, 255,
+                              cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+    seg = (gray >= otsu_t).astype(np.uint8) * 255
+    seg[:y1] = 0
+    seg[y2:] = 0
+    seg[:, :x1] = 0
+    seg[:, x2:] = 0
+
+    # Keep only components connected to the seed (region-grow from the seed).
+    n_labels, labels = cv2.connectedComponents(seg)
+    keep = set(np.unique(labels[seed > 0])) - {0}
+    refined = np.isin(labels, list(keep)).astype(np.uint8) * 255
+    refined = cv2.morphologyEx(refined, cv2.MORPH_CLOSE, _CLOSE_KERNEL)
+
+    closed_seed = cv2.morphologyEx(seed, cv2.MORPH_CLOSE, _CLOSE_KERNEL)
+    if refined.sum() == 0:
+        return closed_seed
+
+    # Excessive-growth guard: legitimate lesion recovery can grow several-fold
+    # (the seed is only the bright core), so a raw area cap would discard the
+    # biggest wins. Only reject when growth is large AND the result is
+    # skull-shaped (frame-spanning bbox or collapsed solidity).
+    seed_area = float((seed > 0).sum())
+    grew = (refined > 0).sum() > _MAX_GROWTH * seed_area
+    if grew and _is_skull_shaped(refined):
+        return closed_seed
+    return refined
+
+
+def _solidity(component: np.ndarray) -> float:
+    """area / convex-hull area of the largest contour (0 if none)."""
+    contours, _ = cv2.findContours(component, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+    if not contours:
+        return 0.0
+    cnt = max(contours, key=cv2.contourArea)
+    hull_area = cv2.contourArea(cv2.convexHull(cnt))
+    return (cv2.contourArea(cnt) / hull_area) if hull_area > 0 else 0.0
+
+
+def _is_skull_shaped(mask: np.ndarray) -> bool:
+    """A frame-spanning bounding box or a low-solidity (ring-like) blob."""
+    h, w = mask.shape
+    _x, _y, bw, bh = cv2.boundingRect(mask)
+    if bw >= w * _MAX_BBOX_FRAC and bh >= h * _MAX_BBOX_FRAC:
+        return True
+    return _solidity((mask > 0).astype(np.uint8)) < _MIN_SOLIDITY
+
+
+def gradcam_mask(image: Image.Image, model=None, device=None,
+                 image_size: int = 150) -> np.ndarray:
+    """Deprecated shim. Localisation no longer uses the classifier; `model` and
+    `device` are ignored. Kept so existing callers/tests keep working."""
+    return tumor_mask(image, image_size=image_size)
 
 
 def mc_area_estimate(mask: np.ndarray, n_samples: int = _MC_AREA_SAMPLES, rng: np.random.Generator | None = None) -> dict:

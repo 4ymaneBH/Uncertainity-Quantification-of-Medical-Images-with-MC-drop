@@ -1,0 +1,5 @@
+y0: orig=(287, 348) resized=(150,150) cam_native_hw=(37, 37) prob=1.000 peak=(x=0,y=0) bright_px=3356 tumor_px=3356 cc_found=True contour_area_px=1526
+y10: orig=(766, 879) resized=(150,150) cam_native_hw=(37, 37) prob=1.000 peak=(x=111,y=148) bright_px=3306 tumor_px=3306 cc_found=True contour_area_px=30
+y100: orig=(630, 630) resized=(150,150) cam_native_hw=(37, 37) prob=0.998 peak=(x=103,y=62) bright_px=3339 tumor_px=3339 cc_found=True contour_area_px=246
+y1000: orig=(264, 336) resized=(150,150) cam_native_hw=(37, 37) prob=0.996 peak=(x=139,y=70) bright_px=4420 tumor_px=488 cc_found=False contour_area_px=0
+y1003: orig=(254, 325) resized=(150,150) cam_native_hw=(37, 37) prob=1.000 peak=(x=127,y=103) bright_px=3374 tumor_px=3374 cc_found=True contour_area_px=1196
