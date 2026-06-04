@@ -24,6 +24,10 @@ class PredictionResponse(BaseModel):
     mean_probability: float
     uncertainty: float
     histogram_b64: str
+    contour_b64: Optional[str] = None
+    scatter_b64: Optional[str] = None
+    area_px: Optional[float] = None
+    mc_area_samples: Optional[int] = None
 
 
 class BatchPredictionItem(BaseModel):
@@ -32,6 +36,10 @@ class BatchPredictionItem(BaseModel):
     mean_probability: Optional[float] = None
     uncertainty: Optional[float] = None
     histogram_b64: Optional[str] = None
+    contour_b64: Optional[str] = None
+    scatter_b64: Optional[str] = None
+    area_px: Optional[float] = None
+    mc_area_samples: Optional[int] = None
     error: Optional[str] = None
 
 

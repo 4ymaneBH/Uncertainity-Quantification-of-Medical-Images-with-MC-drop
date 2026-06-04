@@ -72,3 +72,32 @@ def test_predict_response_schema():
     assert "mean_probability" in data
     assert "uncertainty" in data
     assert "histogram_b64" in data
+
+
+def test_predict_response_includes_analysis_fields():
+    """The /predict response must always include the 4 analysis fields (may be None)."""
+    with patch("mc_dropout.api.routes.mc_predict") as mock_pred:
+        mock_pred.return_value = {
+            "prediction": "No Tumor",
+            "mean_probability": 0.35,
+            "uncertainty": 0.05,
+            "histogram_b64": base64.b64encode(b"fake_png").decode(),
+            "contour_b64": None,
+            "scatter_b64": None,
+            "area_px": None,
+            "mc_area_samples": None,
+        }
+        app = create_app()
+        app.state.model = MagicMock()
+        app.state.config = Config()
+        app.state.device = __import__("torch").device("cpu")
+        client = TestClient(app, raise_server_exceptions=False)
+        img_bytes = _jpeg_bytes()
+        response = client.post(
+            "/predict",
+            files={"file": ("scan.png", img_bytes, "image/png")},
+        )
+    assert response.status_code == 200
+    body = response.json()
+    for key in ("contour_b64", "scatter_b64", "area_px", "mc_area_samples"):
+        assert key in body, f"Missing field: {key}"
