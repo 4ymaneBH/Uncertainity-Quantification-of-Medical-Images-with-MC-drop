@@ -12,7 +12,7 @@ def _blank_image(size: int = 150) -> Image.Image:
 def test_mc_predict_returns_required_keys():
     model = CNNModel()
     result = mc_predict(_blank_image(), model, num_samples=5, device=torch.device("cpu"))
-    assert set(result.keys()) == {"prediction", "mean_probability", "uncertainty", "histogram_b64"}
+    assert {"prediction", "mean_probability", "uncertainty", "histogram_b64"}.issubset(result.keys())
 
 
 def test_mc_predict_prediction_label_is_valid():
@@ -50,3 +50,34 @@ def test_mc_predict_threshold_respected():
         device=torch.device("cpu"),
     )
     assert result2["prediction"] == "No Tumor"
+
+
+def test_mc_predict_no_tumor_has_null_analysis_fields():
+    model = CNNModel()
+    result = mc_predict(
+        _blank_image(), model,
+        num_samples=5,
+        threshold=1.1,   # force "No Tumor"
+        device=torch.device("cpu"),
+    )
+    assert result["prediction"] == "No Tumor"
+    assert result["contour_b64"] is None
+    assert result["scatter_b64"] is None
+    assert result["area_px"] is None
+    assert result["mc_area_samples"] is None
+
+
+def test_mc_predict_tumor_has_analysis_fields():
+    model = CNNModel()
+    result = mc_predict(
+        _blank_image(), model,
+        num_samples=5,
+        threshold=0.0,   # force "Tumor"
+        device=torch.device("cpu"),
+    )
+    assert result["prediction"] == "Tumor"
+    # area_px may be 0 on a blank image (no contour), but keys must exist
+    assert "contour_b64" in result
+    assert "scatter_b64" in result
+    assert "area_px" in result
+    assert "mc_area_samples" in result
