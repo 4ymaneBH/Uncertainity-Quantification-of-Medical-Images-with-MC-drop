@@ -70,6 +70,7 @@ def mc_predict(
     }
 
     if prediction == "Tumor":
+        was_training = model.training
         try:
             resized = image.resize((image_size, image_size))
             mask = gradcam_mask(resized, model, device=device, image_size=image_size)
@@ -90,6 +91,9 @@ def mc_predict(
             result["mc_area_samples"] = area_data["mc_samples_used"]
         except Exception:
             _log.exception("Tumor analysis failed; returning classification result only")
+        finally:
+            if was_training:
+                model.train()
 
     return result
 

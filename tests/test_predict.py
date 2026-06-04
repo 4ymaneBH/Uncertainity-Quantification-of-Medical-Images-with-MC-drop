@@ -76,8 +76,21 @@ def test_mc_predict_tumor_has_analysis_fields():
         device=torch.device("cpu"),
     )
     assert result["prediction"] == "Tumor"
-    # area_px may be 0 on a blank image (no contour), but keys must exist
-    assert "contour_b64" in result
-    assert "scatter_b64" in result
-    assert "area_px" in result
-    assert "mc_area_samples" in result
+    # area_px and mc_area_samples are always set when analysis runs (0 if no contour found)
+    assert result["area_px"] is not None
+    assert result["mc_area_samples"] is not None
+    assert isinstance(result["area_px"], float)
+    assert isinstance(result["mc_area_samples"], int)
+
+
+def test_mc_predict_restores_train_mode_after_tumor():
+    """gradcam_mask sets model.eval(); mc_predict must restore train mode afterwards."""
+    model = CNNModel()
+    model.train()
+    mc_predict(
+        _blank_image(), model,
+        num_samples=5,
+        threshold=0.0,   # force "Tumor" to trigger GradCAM
+        device=torch.device("cpu"),
+    )
+    assert model.training, "model must be back in train() mode after Tumor prediction"
