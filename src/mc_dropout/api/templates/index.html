@@ -631,6 +631,87 @@
     }
 
     /* ─────────────────────────────────────────────────────────────
+       TumorAnalysisPanel
+    ───────────────────────────────────────────────────────────── */
+    function TumorAnalysisPanel({ contourB64, scatterB64, areaPx, mcSamples }) {
+      const [open, setOpen] = React.useState(true);
+      if (!contourB64) return null;
+
+      const fmtArea = n => n == null ? '—' : Number(n).toLocaleString(undefined, { maximumFractionDigits: 0 });
+
+      return (
+        <div style={{ marginTop: 24 }}>
+          <button
+            onClick={() => setOpen(o => !o)}
+            aria-expanded={open}
+            style={{
+              display: 'flex', alignItems: 'center', gap: 6,
+              background: 'none', border: 'none', cursor: 'pointer',
+              color: 'var(--text-secondary)', padding: '4px 0', marginBottom: 10,
+            }}
+          >
+            <ChevronIcon open={open} />
+            <span className="label">Tumor region analysis</span>
+          </button>
+
+          {open && (
+            <div className="fade-up">
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 14 }}>
+                <div>
+                  <div className="label" style={{ marginBottom: 6, fontSize: 10 }}>Contour</div>
+                  <div style={{ borderRadius: 'var(--radius-md)', overflow: 'hidden', border: '1px solid var(--border)' }}>
+                    <img
+                      src={`data:image/png;base64,${contourB64}`}
+                      alt="Tumor contour"
+                      style={{ width: '100%', display: 'block' }}
+                    />
+                  </div>
+                </div>
+                <div>
+                  <div className="label" style={{ marginBottom: 6, fontSize: 10 }}>MC sampling</div>
+                  <div style={{ borderRadius: 'var(--radius-md)', overflow: 'hidden', border: '1px solid var(--border)' }}>
+                    <img
+                      src={`data:image/png;base64,${scatterB64}`}
+                      alt="Monte Carlo area sampling"
+                      style={{ width: '100%', display: 'block' }}
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div style={{
+                display: 'flex', gap: 16, flexWrap: 'wrap',
+                padding: '12px 14px',
+                background: 'var(--bg-elevated)',
+                borderRadius: 'var(--radius-md)',
+                border: '1px solid var(--border-subtle)',
+              }}>
+                <div>
+                  <div className="label" style={{ marginBottom: 3 }}>Estimated area</div>
+                  <span className="mono" style={{ fontSize: 18, fontWeight: 500, color: 'var(--danger)' }}>
+                    {fmtArea(areaPx)}<span style={{ fontSize: 11, color: 'var(--text-secondary)', marginLeft: 3 }}>px²</span>
+                  </span>
+                </div>
+                <div style={{ borderLeft: '1px solid var(--border)', paddingLeft: 16 }}>
+                  <div className="label" style={{ marginBottom: 3 }}>MC samples</div>
+                  <span className="mono" style={{ fontSize: 18, fontWeight: 500, color: 'var(--text-primary)' }}>
+                    {mcSamples != null ? Number(mcSamples).toLocaleString() : '—'}
+                  </span>
+                </div>
+                <div style={{ borderLeft: '1px solid var(--border)', paddingLeft: 16, flex: 1, minWidth: 120 }}>
+                  <div className="label" style={{ marginBottom: 3 }}>Formula</div>
+                  <span className="mono" style={{ fontSize: 11, color: 'var(--text-secondary)', lineHeight: 1.6 }}>
+                    area ≈ (hits / N) × bbox_area
+                  </span>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      );
+    }
+
+    /* ─────────────────────────────────────────────────────────────
        ResultCard
     ───────────────────────────────────────────────────────────── */
     function ResultCard({ item, thumb, index }) {
@@ -657,6 +738,14 @@
           <ConfidenceGauge value={item.mean_probability} />
           <UncertaintyRow sigma={item.uncertainty} />
           {item.histogram_b64 && <Histogram b64={item.histogram_b64} />}
+          {item.contour_b64 && (
+            <TumorAnalysisPanel
+              contourB64={item.contour_b64}
+              scatterB64={item.scatter_b64}
+              areaPx={item.area_px}
+              mcSamples={item.mc_area_samples}
+            />
+          )}
         </div>
       );
     }
