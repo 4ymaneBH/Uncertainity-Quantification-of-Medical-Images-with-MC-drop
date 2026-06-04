@@ -1,0 +1,31 @@
+<h2>How should the Monte Carlo sampling be visualized?</h2>
+<p class="subtitle">The MC area method throws random points into a bounding box — counting hits vs misses gives the area estimate. Do we show that process?</p>
+
+<div class="options">
+  <div class="option" data-choice="a" onclick="toggleSelect(this)">
+    <div class="letter">A</div>
+    <div class="content">
+      <h3>Show the dots — static scatter plot on top of the contour</h3>
+      <p>Generate a second annotated image: the zoomed tumor crop with the contour drawn, <em>plus</em> a sample of N random points plotted — green dots = inside, red dots = outside the contour. Makes the Monte Carlo intuition completely visual.</p>
+      <div style="margin-top:10px;padding:10px;background:#0d1117;border-radius:8px;border:1px solid #21303f;font-size:13px;color:#7d8590;font-style:italic;">
+        Like the classic π estimation scatter plot — but estimating tumor area instead.
+      </div>
+    </div>
+  </div>
+
+  <div class="option" data-choice="b" onclick="toggleSelect(this)">
+    <div class="letter">B</div>
+    <div class="content">
+      <h3>Just the number — clean stat card with the pixel area</h3>
+      <p>Show the contour-annotated image alongside a stat card: area in px², number of MC samples used, and a short formula explanation (<code>area ≈ (hits/total) × bbox_area</code>). No dot scatter.</p>
+    </div>
+  </div>
+
+  <div class="option" data-choice="c" onclick="toggleSelect(this)">
+    <div class="letter">C</div>
+    <div class="content">
+      <h3>Both images side-by-side — contour + MC scatter</h3>
+      <p>Left panel: clean zoomed crop with the contour stroke. Right panel: same crop with the Monte Carlo dots overlaid. Stat card below shows the formula and result.</p>
+    </div>
+  </div>
+</div>

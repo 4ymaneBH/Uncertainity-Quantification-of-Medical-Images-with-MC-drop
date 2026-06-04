@@ -172,6 +172,7 @@ def render_annotated_images(
     bbox: Tuple[int, int, int, int],
     points_xy: np.ndarray,
     hits_mask: np.ndarray,
+    rng: np.random.Generator | None = None,
 ) -> Tuple[str | None, str | None]:
     """Produce two base64-encoded PNG strings for the result panel.
 
@@ -201,10 +202,14 @@ def render_annotated_images(
     cv2.drawContours(scatter_img, [shifted], -1, (0, 255, 255), _CONTOUR_STROKE)
 
     # Cap dots rendered to avoid bloating the image
+    if rng is None:
+        rng = np.random.default_rng()
     cap = min(len(points_xy), _MAX_SCATTER_DOTS)
-    idx = np.random.choice(len(points_xy), cap, replace=False) if len(points_xy) > cap else np.arange(len(points_xy))
+    idx = rng.choice(len(points_xy), cap, replace=False) if len(points_xy) > cap else np.arange(len(points_xy))
+    crop_h, crop_w = scatter_img.shape[:2]
     for i in idx:
-        px, py = int(points_xy[i, 0]) - x1, int(points_xy[i, 1]) - y1
+        px = max(0, min(crop_w - 1, int(points_xy[i, 0]) - x1))
+        py = max(0, min(crop_h - 1, int(points_xy[i, 1]) - y1))
         color = (0, 200, 0) if hits_mask[i] else (0, 0, 200)  # BGR
         cv2.circle(scatter_img, (px, py), _DOT_RADIUS, color, -1)
 

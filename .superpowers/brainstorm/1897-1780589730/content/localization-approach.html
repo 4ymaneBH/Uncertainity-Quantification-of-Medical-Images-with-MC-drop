@@ -1,0 +1,40 @@
+<h2>How should we find the tumor region?</h2>
+<p class="subtitle">The current CNN classifies Tumor/No Tumor — it doesn't know <em>where</em> the tumor is. We need a localization strategy to draw a contour and compute area.</p>
+
+<div class="options">
+  <div class="option" data-choice="a" onclick="toggleSelect(this)">
+    <div class="letter">A</div>
+    <div class="content">
+      <h3>GradCAM — Ask the existing CNN where it "looks"</h3>
+      <p>Backpropagate gradients through the last conv layer to generate a heatmap showing which pixels influenced the Tumor prediction. Threshold the heatmap to produce a binary mask → contour.</p>
+      <div class="pros-cons" style="margin-top:10px">
+        <div class="pros"><h4>Pros</h4><ul><li>Uses the model already in the project — no new model needed</li><li>Directly shows <em>why</em> the model said "Tumor"</li><li>Great pedagogical link between uncertainty (MC Dropout) and explainability (GradCAM)</li></ul></div>
+        <div class="cons"><h4>Cons</h4><ul><li>Heatmap can be imprecise / blobby — not a sharp clinical contour</li><li>Requires gradient access (runs in train mode, which we already do for MC Dropout)</li></ul></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="option" data-choice="b" onclick="toggleSelect(this)">
+    <div class="letter">B</div>
+    <div class="content">
+      <h3>Image Processing — Threshold + Contour on the MRI</h3>
+      <p>Convert to grayscale, apply Otsu's threshold or adaptive thresholding (OpenCV), find connected components, pick the largest bright/dark region as the tumor candidate.</p>
+      <div class="pros-cons" style="margin-top:10px">
+        <div class="pros"><h4>Pros</h4><ul><li>No new model — pure OpenCV/PIL math</li><li>Produces clean, sharp contours</li><li>Works entirely in pixel space — natural fit for Monte Carlo area estimation</li></ul></div>
+        <div class="cons"><h4>Cons</h4><ul><li>Threshold must be tuned; may fire on non-tumor bright regions (skull, etc.)</li><li>Not linked to the CNN's decision — separate pipeline</li></ul></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="option" data-choice="c" onclick="toggleSelect(this)">
+    <div class="letter">C</div>
+    <div class="content">
+      <h3>Combine Both — GradCAM mask guided by image intensity</h3>
+      <p>Run GradCAM to get a rough attention region, then refine with Otsu thresholding <em>only inside</em> that region. Gives a model-grounded but geometrically clean contour.</p>
+      <div class="pros-cons" style="margin-top:10px">
+        <div class="pros"><h4>Pros</h4><ul><li>Most accurate contour in practice</li><li>Keeps the story: model finds the region → math defines the boundary</li></ul></div>
+        <div class="cons"><h4>Cons</h4><ul><li>More moving parts — two stages to tune and explain</li><li>Higher complexity for a demo feature</li></ul></div>
+      </div>
+    </div>
+  </div>
+</div>

@@ -1,0 +1,40 @@
+<h2>Where should the tumor analysis panel appear?</h2>
+<p class="subtitle">When prediction = "Tumor", the contour image + MC area estimate need a home in the UI. Three options:</p>
+
+<div class="options">
+  <div class="option" data-choice="a" onclick="toggleSelect(this)">
+    <div class="letter">A</div>
+    <div class="content">
+      <h3>Auto-expand below the result card</h3>
+      <p>When the model returns "Tumor", a new panel slides in automatically beneath the existing result (histogram + probability). No extra click needed.</p>
+      <div style="margin-top:10px; padding:10px; background:#0d1117; border-radius:8px; border:1px solid #21303f; font-size:13px; color:#7d8590;">
+        <div style="background:#161b22;border-radius:6px;padding:8px;margin-bottom:6px;">📊 Probability gauge + histogram (existing)</div>
+        <div style="background:#1c2433;border:1px solid #3b82f6;border-radius:6px;padding:8px;color:#e6edf3;">🔬 Tumor Analysis ← <em>appears automatically</em><br/><span style="color:#7d8590;font-size:12px">Contour image · MC area · sample count</span></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="option" data-choice="b" onclick="toggleSelect(this)">
+    <div class="letter">B</div>
+    <div class="content">
+      <h3>Button-triggered — "Analyse Tumor Region"</h3>
+      <p>A button appears in the result card when prediction = "Tumor". User clicks it to run the contour + MC area analysis on demand (separate API call).</p>
+      <div style="margin-top:10px; padding:10px; background:#0d1117; border-radius:8px; border:1px solid #21303f; font-size:13px; color:#7d8590;">
+        <div style="background:#161b22;border-radius:6px;padding:8px;margin-bottom:6px;">📊 Probability gauge + histogram (existing)</div>
+        <div style="background:#161b22;border-radius:6px;padding:8px;">[ Analyse Tumor Region → ] button</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="option" data-choice="c" onclick="toggleSelect(this)">
+    <div class="letter">C</div>
+    <div class="content">
+      <h3>Always computed — part of the single /predict response</h3>
+      <p>The analysis runs as part of the existing <code>/predict</code> endpoint. When "Tumor", the panel is always shown. When "No Tumor", it's hidden. One request, everything at once.</p>
+      <div style="margin-top:10px; padding:10px; background:#0d1117; border-radius:8px; border:1px solid #21303f; font-size:13px; color:#7d8590;">
+        <div style="background:#161b22;border-radius:6px;padding:8px;margin-bottom:6px;">📊 Probability gauge + histogram (existing)</div>
+        <div style="background:#1c2433;border:1px dashed #22c55e;border-radius:6px;padding:8px;color:#e6edf3;">🔬 Tumor Analysis <em>(always computed with /predict)</em><br/><span style="color:#7d8590;font-size:12px">Contour image · MC area · sample count</span></div>
+      </div>
+    </div>
+  </div>
+</div>
