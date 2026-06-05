@@ -48,11 +48,18 @@ def tumor_mask(image: Image.Image, image_size: int = 150) -> np.ndarray:
 
 
 def _select_seed_blob(gray: np.ndarray) -> np.ndarray | None:
-    """Largest connected bright blob that passes the skull-safety shape filters.
+    """Brightest connected bright blob that passes the skull-safety shape filters.
 
     A tumor is a compact, mostly-filled, sub-frame blob. The skull rim is a thin
     hollow ring (low solidity / low extent) that spans the whole frame, so it is
     rejected by shape regardless of how bright it is.
+
+    Among the shape-valid candidates we rank by *integrated brightness above the
+    threshold* (sum of pixel intensities minus the bright cutoff), not raw area.
+    A genuinely enhancing tumor is a small, very bright disc; ranking by area
+    instead lets a large but only faintly-bright region (e.g. the central
+    grey-matter / parenchyma) outvote it. Brightness-mass favours the compact,
+    intensely-bright lesion over a big dim blob.
     """
     h, w = gray.shape
     thresh = float(np.percentile(gray, _BRIGHT_PERCENTILE))
@@ -61,7 +68,7 @@ def _select_seed_blob(gray: np.ndarray) -> np.ndarray | None:
 
     n_labels, labels, stats, _ = cv2.connectedComponentsWithStats(bright)
     best_label: int | None = None
-    best_area = 0
+    best_mass = 0.0
 
     for i in range(1, n_labels):
         area = int(stats[i, cv2.CC_STAT_AREA])
@@ -75,8 +82,9 @@ def _select_seed_blob(gray: np.ndarray) -> np.ndarray | None:
             continue
         if _solidity((labels == i).astype(np.uint8)) < _MIN_SOLIDITY:
             continue
-        if area > best_area:
-            best_area, best_label = area, i
+        mass = float(np.clip(gray[labels == i].astype(np.float64) - thresh, 0, None).sum())
+        if mass > best_mass:
+            best_mass, best_label = mass, i
 
     if best_label is None:
         return None
