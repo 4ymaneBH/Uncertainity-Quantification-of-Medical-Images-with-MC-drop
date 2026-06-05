@@ -75,7 +75,9 @@ def mc_predict(
         try:
             resized = image.resize((image_size, image_size))
             mask = tumor_mask(resized, image_size=image_size)
-            area_data = mc_area_estimate(mask)
+            gray = np.array(resized.convert("L"))
+            brain_px = float((gray > 10).sum())
+            area_data = mc_area_estimate(mask, brain_area_px=brain_px)
             if area_data["contour_pts"] is not None:
                 h, w = mask.shape
                 bbox = (0, 0, w, h)

@@ -183,11 +183,20 @@ def gradcam_mask(image: Image.Image, model=None, device=None,
     return tumor_mask(image, image_size=image_size)
 
 
-def mc_area_estimate(mask: np.ndarray, n_samples: int = _MC_AREA_SAMPLES, rng: np.random.Generator | None = None) -> dict:
+def mc_area_estimate(
+    mask: np.ndarray,
+    n_samples: int = _MC_AREA_SAMPLES,
+    rng: np.random.Generator | None = None,
+    brain_area_px: float | None = None,
+) -> dict:
     """Estimate the area of the largest contour in mask using Monte Carlo sampling.
+
+    brain_area_px: non-background pixel count of the source image used as the
+        denominator for area_pct. When None, falls back to the full image area.
 
     Returns a dict with keys:
         area_px       – estimated area in pixels (float)
+        area_pct      – tumor area as % of brain area (float)
         mc_samples_used – n_samples (int)
         hits          – number of points inside the contour (int)
         points_xy     – all sampled (x, y) pairs, shape (n_samples, 2) (ndarray)
@@ -197,7 +206,8 @@ def mc_area_estimate(mask: np.ndarray, n_samples: int = _MC_AREA_SAMPLES, rng: n
     contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
 
     h_img, w_img = mask.shape
-    brain_area_px = float(h_img * w_img)
+    if brain_area_px is None or brain_area_px <= 0:
+        brain_area_px = float(h_img * w_img)
 
     if not contours:
         empty_pts = np.zeros((n_samples, 2), dtype=np.float32)
