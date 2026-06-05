@@ -91,11 +91,34 @@ def _select_seed_blob(gray: np.ndarray) -> np.ndarray | None:
     return (labels == best_label).astype(np.uint8) * 255
 
 
+def _lesion_threshold(roi: np.ndarray) -> float:
+    """Intensity cutoff that separates the lesion from the surrounding brain.
+
+    A single Otsu split inside the ROI only separates the dark background/CSF
+    from *all* bright tissue, so on images where the lesion sits in bright brain
+    (e.g. FLAIR white matter, T1 grey matter) it lumps the tumor together with
+    the whole hemisphere and the mask floods the ROI box.
+
+    We instead run Otsu twice: the first split isolates the bright tissue
+    (brain + lesion) from the dark background; the second split, computed *only*
+    over those bright pixels, separates the brighter lesion from the dimmer
+    normal brain. The higher of the two thresholds is used so the periphery is
+    recovered without leaking into healthy tissue.
+    """
+    t1, _ = cv2.threshold(roi, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+    bright = roi[roi >= t1]
+    if bright.size < 10:
+        return float(t1)
+    t2, _ = cv2.threshold(bright.reshape(-1, 1), 0, 255,
+                          cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+    return float(max(t1, t2))
+
+
 def _refine_roi(gray: np.ndarray, seed: np.ndarray) -> np.ndarray:
     """Recover the full lesion: local Otsu in the seed ROI, connected to the seed.
 
     The global brightness percentile only keeps the brightest *core* of the
-    lesion; re-thresholding locally (Otsu) inside the seed's padded bounding box
+    lesion; re-thresholding locally inside the seed's padded bounding box
     recovers the dimmer periphery. The skull cannot leak in because (a) the ROI
     excludes the rim and (b) we keep only components touching the seed.
     """
@@ -106,9 +129,8 @@ def _refine_roi(gray: np.ndarray, seed: np.ndarray) -> np.ndarray:
     x2 = min(w, x + bw + _ROI_PAD)
     y2 = min(h, y + bh + _ROI_PAD)
 
-    otsu_t, _ = cv2.threshold(gray[y1:y2, x1:x2], 0, 255,
-                              cv2.THRESH_BINARY + cv2.THRESH_OTSU)
-    seg = (gray >= otsu_t).astype(np.uint8) * 255
+    thresh = _lesion_threshold(gray[y1:y2, x1:x2])
+    seg = (gray >= thresh).astype(np.uint8) * 255
     seg[:y1] = 0
     seg[y2:] = 0
     seg[:, :x1] = 0
