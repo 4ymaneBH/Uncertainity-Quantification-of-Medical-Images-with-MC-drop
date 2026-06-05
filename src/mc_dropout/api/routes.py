@@ -27,6 +27,7 @@ class PredictionResponse(BaseModel):
     contour_b64: Optional[str] = None
     scatter_b64: Optional[str] = None
     area_px: Optional[float] = None
+    area_pct: Optional[float] = None
     mc_area_samples: Optional[int] = None
 
 
@@ -39,6 +40,7 @@ class BatchPredictionItem(BaseModel):
     contour_b64: Optional[str] = None
     scatter_b64: Optional[str] = None
     area_px: Optional[float] = None
+    area_pct: Optional[float] = None
     mc_area_samples: Optional[int] = None
     error: Optional[str] = None
 

@@ -66,6 +66,7 @@ def mc_predict(
         "contour_b64": None,
         "scatter_b64": None,
         "area_px": None,
+        "area_pct": None,
         "mc_area_samples": None,
     }
 
@@ -88,6 +89,7 @@ def mc_predict(
                 result["contour_b64"] = contour_b64
                 result["scatter_b64"] = scatter_b64
             result["area_px"] = area_data["area_px"]
+            result["area_pct"] = area_data["area_pct"]
             result["mc_area_samples"] = area_data["mc_samples_used"]
         except Exception:
             _log.exception("Tumor analysis failed; returning classification result only")

@@ -633,11 +633,12 @@
     /* ─────────────────────────────────────────────────────────────
        TumorAnalysisPanel
     ───────────────────────────────────────────────────────────── */
-    function TumorAnalysisPanel({ contourB64, scatterB64, areaPx, mcSamples }) {
+    function TumorAnalysisPanel({ contourB64, scatterB64, areaPx, areaPct, mcSamples }) {
       const [open, setOpen] = React.useState(true);
       if (!contourB64) return null;
 
       const fmtArea = n => n == null ? '—' : Number(n).toLocaleString(undefined, { maximumFractionDigits: 0 });
+      const fmtPct  = n => n == null ? '—' : Number(n).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + '%';
 
       return (
         <div style={{ marginTop: 24 }}>
@@ -691,6 +692,9 @@
                   <span className="mono" style={{ fontSize: 18, fontWeight: 500, color: 'var(--danger)' }}>
                     {fmtArea(areaPx)}<span style={{ fontSize: 11, color: 'var(--text-secondary)', marginLeft: 3 }}>px²</span>
                   </span>
+                  <span className="mono" style={{ fontSize: 13, color: 'var(--danger)', marginLeft: 8, opacity: 0.85 }}>
+                    ({fmtPct(areaPct)} of brain)
+                  </span>
                 </div>
                 <div style={{ borderLeft: '1px solid var(--border)', paddingLeft: 16 }}>
                   <div className="label" style={{ marginBottom: 3 }}>MC samples</div>
@@ -743,6 +747,7 @@
               contourB64={item.contour_b64}
               scatterB64={item.scatter_b64}
               areaPx={item.area_px}
+              areaPct={item.area_pct}
               mcSamples={item.mc_area_samples}
             />
           )}

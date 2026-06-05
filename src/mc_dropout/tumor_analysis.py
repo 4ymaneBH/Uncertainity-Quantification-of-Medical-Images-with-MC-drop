@@ -196,10 +196,14 @@ def mc_area_estimate(mask: np.ndarray, n_samples: int = _MC_AREA_SAMPLES, rng: n
     """
     contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
 
+    h_img, w_img = mask.shape
+    brain_area_px = float(h_img * w_img)
+
     if not contours:
         empty_pts = np.zeros((n_samples, 2), dtype=np.float32)
         return {
             "area_px": 0.0,
+            "area_pct": 0.0,
             "mc_samples_used": n_samples,
             "hits": 0,
             "points_xy": empty_pts,
@@ -213,6 +217,7 @@ def mc_area_estimate(mask: np.ndarray, n_samples: int = _MC_AREA_SAMPLES, rng: n
     if cv2.contourArea(contour) == 0:
         return {
             "area_px": 0.0,
+            "area_pct": 0.0,
             "mc_samples_used": n_samples,
             "hits": 0,
             "points_xy": np.zeros((n_samples, 2), dtype=np.float32),
@@ -245,9 +250,11 @@ def mc_area_estimate(mask: np.ndarray, n_samples: int = _MC_AREA_SAMPLES, rng: n
     )
     hits = int(hits_mask.sum())
     area_px = (hits / n_samples) * bbox_area if n_samples > 0 else 0.0
+    area_pct = (area_px / brain_area_px * 100.0) if brain_area_px > 0 else 0.0
 
     return {
         "area_px": area_px,
+        "area_pct": area_pct,
         "mc_samples_used": n_samples,
         "hits": hits,
         "points_xy": points_xy,
